@@ -13,11 +13,14 @@ def hardened_session(timeout=15):
     s.request = _wrap_request(s.request, timeout=timeout)
     return s
 
+
 def _wrap_request(fn, timeout=15):
     def _inner(method, url, **kwargs):
         kwargs.setdefault("timeout", timeout)
         return fn(method, url, **kwargs)
+
     return _inner
+
 
 def redact(text: str, keep=3) -> str:
     if not text:

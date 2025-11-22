@@ -11,14 +11,23 @@ def carve_http_payloads(pcap_path: str, out_dir: str, phase=None) -> list[dict]:
     if phase:
         phase.set(5, "Running tshark…")
     cmd = [
-        "tshark", "-r", pcap_path,
-        "-Y", "http && http.file_data",
-        "-T", "fields",
-        "-e", "frame.time_epoch",
-        "-e", "tcp.stream",
-        "-e", "http.content_type",
-        "-e", "http.content_length",
-        "-e", "http.file_data",
+        "tshark",
+        "-r",
+        pcap_path,
+        "-Y",
+        "http && http.file_data",
+        "-T",
+        "fields",
+        "-e",
+        "frame.time_epoch",
+        "-e",
+        "tcp.stream",
+        "-e",
+        "http.content_type",
+        "-e",
+        "http.content_length",
+        "-e",
+        "http.file_data",
     ]
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, text=True)
@@ -48,14 +57,16 @@ def carve_http_payloads(pcap_path: str, out_dir: str, phase=None) -> list[dict]:
             fpath.write_bytes(data_bytes)
         except Exception:
             continue
-        results.append({
-            "time": ts,
-            "tcp_stream": stream_id,
-            "content_type": ctype,
-            "content_length": clen,
-            "sha256": h,
-            "path": str(fpath),
-        })
+        results.append(
+            {
+                "time": ts,
+                "tcp_stream": stream_id,
+                "content_type": ctype,
+                "content_length": clen,
+                "sha256": h,
+                "path": str(fpath),
+            }
+        )
         if phase and total:
             pct = 10 + int((i / total) * 80)
             phase.set(pct, f"Carved {i}/{total}")

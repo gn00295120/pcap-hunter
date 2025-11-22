@@ -13,6 +13,7 @@ def ss_init(key, default):
         st.session_state[key] = default
     return st.session_state[key]
 
+
 def reset_run_state(phase_titles):
     st.session_state["run_active"] = True
     st.session_state["run_started_at"] = time.time()
@@ -21,11 +22,14 @@ def reset_run_state(phase_titles):
         st.session_state[f"skip_{slug}"] = False
         st.session_state[f"done_{slug}"] = False
 
+
 def is_run_active() -> bool:
     return st.session_state.get("run_active", False)
 
+
 def end_run():
     st.session_state["run_active"] = False
+
 
 class PhaseTracker:
     def __init__(self, total_phases: int, progress_container: Optional[st.delta_generator.DeltaGenerator] = None):
@@ -60,15 +64,16 @@ class PhaseTracker:
                 st.button(
                     "Skip",
                     key=f"btn_{slug}",
-                    width='stretch',
+                    width="stretch",
                     on_click=lambda: st.session_state.__setitem__(skip_key, True),
                 )
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
         return PhaseHandle(self, bar, text, title, slug, skip_key, done_key)
 
     def mark_phase_done(self, phase_title: str, skipped: bool = False):
         self.done_phases += 1
         self.update_overall(("Skipped" if skipped else "Completed") + f": {phase_title}")
+
 
 class PhaseHandle:
     def __init__(self, tracker, bar, text, title, slug, skip_key, done_key):

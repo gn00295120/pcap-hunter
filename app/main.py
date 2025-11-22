@@ -41,12 +41,15 @@ def get_df_state(key: str) -> pd.DataFrame:
     val = st.session_state.get(key, None)
     return val if isinstance(val, pd.DataFrame) else pd.DataFrame()
 
+
 def _ss_default(key: str, value):
     if key not in st.session_state:
         st.session_state[key] = value
 
+
 def cfg_get(name: str, env_key: str, default):
     return st.session_state.get(name) or os.getenv(env_key, default)
+
 
 def pick_top_public_ips(features: dict, n: int) -> list[str]:
     """
@@ -74,7 +77,8 @@ def pick_top_public_ips(features: dict, n: int) -> list[str]:
         return [ip for ip in (features or {}).get("artifacts", {}).get("ips", []) if is_public_ipv4(ip)]
 
     ranked = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
-    return [ip for ip, _ in ranked[:max(1, n)]]
+    return [ip for ip, _ in ranked[: max(1, n)]]
+
 
 # ---------------------------------------------------------------------------
 # Streamlit App
@@ -90,9 +94,13 @@ tab_upload, tab_progress, tab_results, tab_config = make_tabs()
 
 # Defaults
 for k, v in [
-    ("features", None), ("osint", None), ("report", None),
-    ("beacon_df", pd.DataFrame()), ("zeek_tables", {}), ("carved", []),
-    ("__total_pkts", None)
+    ("features", None),
+    ("osint", None),
+    ("report", None),
+    ("beacon_df", pd.DataFrame()),
+    ("zeek_tables", {}),
+    ("carved", []),
+    ("__total_pkts", None),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -102,7 +110,7 @@ with tab_upload:
     st.subheader("1) Load PCAP")
     col_a, col_b = st.columns([1, 1])
     with col_a:
-        uploaded = st.file_uploader("Upload a .pcap / .pcapng", type=["pcap","pcapng"])
+        uploaded = st.file_uploader("Upload a .pcap / .pcapng", type=["pcap", "pcapng"])
     with col_b:
         pcap_path_text = st.text_input("...or type a container path (e.g., /data/capture.pcap)", value="")
 
@@ -133,22 +141,24 @@ with tab_upload:
         ("LLM report", True),
     ]
 
-    start = st.button("Extract & Analyze", type="primary", use_container_width='strech')
+    start = st.button("Extract & Analyze", type="primary", use_container_width="strech")
     if start:
         if not pcap_path or not pathlib.Path(pcap_path).exists():
             st.error("Please upload a PCAP or provide a valid path.")
             st.stop()
         reset_run_state([t for (t, enabled) in phases if enabled])
-        st.session_state.update({
-            "features": None,
-            "osint": None,
-            "report": None,
-            "beacon_df": pd.DataFrame(),
-            "zeek_tables": {},
-            "carved": [],
-            "__total_pkts": None,
-            "__pcap_path": pcap_path
-        })
+        st.session_state.update(
+            {
+                "features": None,
+                "osint": None,
+                "report": None,
+                "beacon_df": pd.DataFrame(),
+                "zeek_tables": {},
+                "carved": [],
+                "__total_pkts": None,
+                "__pcap_path": pcap_path,
+            }
+        )
         st.success("Analysis started. Switch to the **Progress** tab to monitor.")
         st.rerun()
 
@@ -194,7 +204,7 @@ with tab_progress:
         # Safe loads
         features = st.session_state.get("features") or {
             "flows": [],
-            "artifacts": {"ips": [], "domains": [], "urls": [], "hashes": [], "ja3": []}
+            "artifacts": {"ips": [], "domains": [], "urls": [], "hashes": [], "ja3": []},
         }
         zeek_tables = st.session_state.get("zeek_tables") or {}
         beacon_df = get_df_state("beacon_df")
@@ -211,7 +221,8 @@ with tab_progress:
                     st.session_state["__total_pkts"] = count_packets_fast(pcap_path)
                     p.done(
                         f"Found ~{st.session_state['__total_pkts']:,} packets."
-                        if st.session_state["__total_pkts"] else "Count unavailable."
+                        if st.session_state["__total_pkts"]
+                        else "Count unavailable."
                     )
                 else:
                     p.done("Counting skipped.")
@@ -305,10 +316,11 @@ with tab_progress:
         if not st.session_state.get(f"done_{make_slug('OSINT enrichment')}", False):
             if not st.session_state.get(f"skip_{make_slug('OSINT enrichment')}", False):
                 with st.spinner("OSINT enrichment…"):
-                    feats = features if isinstance(features, dict) else {
-                        "flows": [],
-                        "artifacts": {"ips": [], "domains": [], "urls": [], "hashes": [], "ja3": []}
-                    }
+                    feats = (
+                        features
+                        if isinstance(features, dict)
+                        else {"flows": [], "artifacts": {"ips": [], "domains": [], "urls": [], "hashes": [], "ja3": []}}
+                    )
                     arts = dict(feats.get("artifacts", {}))
                     arts["ips"] = [ip for ip in arts.get("ips", []) if is_public_ipv4(ip)]
                     if osint_top_n > 0:

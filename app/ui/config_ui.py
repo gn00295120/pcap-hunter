@@ -7,14 +7,14 @@ from app import config as C
 
 def init_config_defaults():
     _ss_default("cfg_lm_base_url", os.getenv("LMSTUDIO_BASE_URL", C.LM_BASE_URL))
-    _ss_default("cfg_lm_api_key",  os.getenv("LMSTUDIO_API_KEY", C.LM_API_KEY))
-    _ss_default("cfg_lm_model",    os.getenv("LMSTUDIO_MODEL", C.LM_MODEL))
+    _ss_default("cfg_lm_api_key", os.getenv("LMSTUDIO_API_KEY", C.LM_API_KEY))
+    _ss_default("cfg_lm_model", os.getenv("LMSTUDIO_MODEL", C.LM_MODEL))
 
-    _ss_default("cfg_otx",        os.getenv("OTX_KEY", C.OTX_KEY))
-    _ss_default("cfg_vt",         os.getenv("VT_KEY", C.VT_KEY))
-    _ss_default("cfg_abuseipdb",  os.getenv("ABUSEIPDB_KEY", C.ABUSEIPDB_KEY))
-    _ss_default("cfg_greynoise",  os.getenv("GREYNOISE_KEY", C.GREYNOISE_KEY))
-    _ss_default("cfg_shodan",     os.getenv("SHODAN_KEY", C.SHODAN_KEY))
+    _ss_default("cfg_otx", os.getenv("OTX_KEY", C.OTX_KEY))
+    _ss_default("cfg_vt", os.getenv("VT_KEY", C.VT_KEY))
+    _ss_default("cfg_abuseipdb", os.getenv("ABUSEIPDB_KEY", C.ABUSEIPDB_KEY))
+    _ss_default("cfg_greynoise", os.getenv("GREYNOISE_KEY", C.GREYNOISE_KEY))
+    _ss_default("cfg_shodan", os.getenv("SHODAN_KEY", C.SHODAN_KEY))
 
     _ss_default("cfg_limit_packets", C.DEFAULT_PYSHARK_LIMIT)
     _ss_default("cfg_do_pyshark", True)
@@ -23,9 +23,11 @@ def init_config_defaults():
     _ss_default("cfg_pre_count", C.PRECNT_DEFAULT)
     _ss_default("cfg_osint_top_ips", C.OSINT_TOP_IPS_DEFAULT)
 
+
 def _ss_default(key: str, value):
     if key not in st.session_state:
         st.session_state[key] = value
+
 
 def render_config_tab():
     st.markdown("### Configuration")
@@ -35,24 +37,16 @@ def render_config_tab():
         st.session_state["cfg_lm_base_url"] = st.text_input(
             "OpenAI base_url", value=st.session_state.get("cfg_lm_base_url")
         )
-        st.session_state["cfg_lm_model"] = st.text_input(
-            "Model name", value=st.session_state.get("cfg_lm_model")
-        )
+        st.session_state["cfg_lm_model"] = st.text_input("Model name", value=st.session_state.get("cfg_lm_model"))
     with c2:
-        st.session_state["cfg_lm_api_key"] = st.text_input(
-            "API Key", value=st.session_state.get("cfg_lm_api_key")
-        )
+        st.session_state["cfg_lm_api_key"] = st.text_input("API Key", value=st.session_state.get("cfg_lm_api_key"))
 
     st.markdown("---")
     st.markdown("#### OSINT API Keys (optional)")
     oc1, oc2, oc3 = st.columns(3)
     with oc1:
-        st.session_state["cfg_otx"] = st.text_input(
-            "OTX", type="password", value=st.session_state.get("cfg_otx")
-        )
-        st.session_state["cfg_vt"] = st.text_input(
-            "VirusTotal", type="password", value=st.session_state.get("cfg_vt")
-        )
+        st.session_state["cfg_otx"] = st.text_input("OTX", type="password", value=st.session_state.get("cfg_otx"))
+        st.session_state["cfg_vt"] = st.text_input("VirusTotal", type="password", value=st.session_state.get("cfg_vt"))
     with oc2:
         st.session_state["cfg_abuseipdb"] = st.text_input(
             "AbuseIPDB", type="password", value=st.session_state.get("cfg_abuseipdb")
@@ -71,7 +65,7 @@ def render_config_tab():
         "PyShark packet limit (0 = no limit)",
         min_value=0,
         value=int(st.session_state.get("cfg_limit_packets", C.DEFAULT_PYSHARK_LIMIT)),
-        step=10000
+        step=10000,
     )
     tc1, tc2, tc3, tc4 = st.columns(4)
     with tc1:
@@ -79,9 +73,7 @@ def render_config_tab():
             "Run PyShark", value=bool(st.session_state.get("cfg_do_pyshark", True))
         )
     with tc2:
-        st.session_state["cfg_do_zeek"] = st.checkbox(
-            "Run Zeek", value=bool(st.session_state.get("cfg_do_zeek", True))
-        )
+        st.session_state["cfg_do_zeek"] = st.checkbox("Run Zeek", value=bool(st.session_state.get("cfg_do_zeek", True)))
     with tc3:
         st.session_state["cfg_do_carve"] = st.checkbox(
             "Carve HTTP bodies", value=bool(st.session_state.get("cfg_do_carve", True))
@@ -93,13 +85,14 @@ def render_config_tab():
 
     st.session_state["cfg_osint_top_ips"] = st.number_input(
         "OSINT: Top N public IPs to enrich (0 = all)",
-        min_value=0, max_value=1000,
+        min_value=0,
+        max_value=1000,
         value=int(st.session_state.get("cfg_osint_top_ips", 50)),
-        step=5
+        step=5,
     )
 
     st.caption("Changes are saved immediately in Session State.")
-    col_buttons = st.columns([1,1,6])
+    col_buttons = st.columns([1, 1, 6])
     with col_buttons[0]:
         if st.button("Apply & Rerun"):
             st.rerun()

@@ -22,6 +22,7 @@ Your analysis must be:
 Avoid generic advice. Focus on specific indicators found in the data. If no significant threats are found,
 state that clearly but note any interesting anomalies."""
 
+
 def generate_report(base_url: str, api_key: str, model: str, context: Dict[str, Any]) -> str:
     """
     Generate an LLM report using a summarized context that always fits small context models (4k).

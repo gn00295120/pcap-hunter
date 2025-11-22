@@ -22,22 +22,27 @@ def inject_css():
         unsafe_allow_html=True,
     )
 
+
 def make_tabs():
     """Top tabs: Upload • Progress • Results • Config."""
     tabs = st.tabs(["📤 Upload", "📈 Progress", "📊 Results", "⚙️ Config"])
     return tabs[0], tabs[1], tabs[2], tabs[3]
+
 
 def make_progress_panel(container):
     with container:
         st.markdown("### Progress")
         return st.container()
 
+
 def make_results_panel(container):
     with container:
         st.markdown("### Results")
         return st.container()
 
+
 # ---------------- Results renderers ----------------
+
 
 def render_overview(result_col, features):
     with result_col:
@@ -48,13 +53,12 @@ def render_overview(result_col, features):
             "Domains": len(feats["artifacts"].get("domains", [])),
             "Flows": len(feats.get("flows", [])),
             "Carved Bodies": len(
-                feats["artifacts"].get("hashes", [])
-                if isinstance(feats.get("artifacts", {}), dict)
-                else []
+                feats["artifacts"].get("hashes", []) if isinstance(feats.get("artifacts", {}), dict) else []
             ),
         }
         df = pd.DataFrame([row]).rename(index={0: ""})
-        st.dataframe(df, width='stretch', hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
+
 
 def render_zeek(result_col, zeek_tables):
     with result_col:
@@ -66,11 +70,12 @@ def render_zeek(result_col, zeek_tables):
                 with tabs[i]:
                     df = zeek_tables.get(name)
                     if isinstance(df, pd.DataFrame) and not df.empty:
-                        st.dataframe(df, width='stretch', hide_index=True)
+                        st.dataframe(df, width="stretch", hide_index=True)
                     else:
                         st.caption("No rows.")
         else:
             st.caption("No Zeek logs loaded.")
+
 
 def render_carved(result_col, carved):
     with result_col:
@@ -79,9 +84,10 @@ def render_carved(result_col, carved):
                 df = pd.DataFrame(carved)
                 cols = ["time", "tcp_stream", "content_type", "content_length", "sha256", "path"]
                 cols = [c for c in cols if c in df.columns]
-                st.dataframe(df[cols], width='stretch', hide_index=True)
+                st.dataframe(df[cols], width="stretch", hide_index=True)
             else:
                 st.caption("No HTTP payloads carved.")
+
 
 def render_osint(result_col, osint_data):
     with result_col:
@@ -100,6 +106,7 @@ def render_osint(result_col, osint_data):
                     vt_attr = (obj.get("vt") or {}).get("data", {}).get("attributes", {})
                     cats = vt_attr.get("categories", "n/a")
                     st.markdown(f"- `{dom}` — VT cat: {cats}")
+
 
 def render_report(result_col, report_md):
     with result_col:

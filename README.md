@@ -1,111 +1,108 @@
 # PCAP Hunter
 
-PCAP Hunter is a comprehensive threat hunting workbench designed to analyze PCAP files using a combination of industry-standard tools (Zeek, Tshark) and modern AI (LLMs). It provides a streamlined, interactive interface for packet analysis, beaconing detection, payload carving, and OSINT enrichment, culminating in an AI-generated security report.
+**PCAP Hunter** is an advanced, AI-enhanced threat hunting workbench designed to bridge the gap between manual packet analysis and automated security monitoring. It empowers SOC analysts and threat hunters to rapidly ingest, analyze, and extract actionable intelligence from raw PCAP files.
 
-## Features
+By combining industry-standard network analysis tools (**Zeek**, **Tshark**) with modern **Large Language Models (LLMs)** and **OSINT** APIs, PCAP Hunter automates the tedious parts of packet analysis—parsing, correlation, and enrichment—allowing analysts to focus on detection and response.
 
-- **Packet Analysis**: Automated packet counting and deep flow analysis using PyShark and Tshark.
-- **Zeek Integration**: Automatically runs Zeek to generate and analyze core network logs (conn, dns, http, ssl).
-- **Beaconing Detection**: Identifies potential C2 (Command & Control) beaconing behavior by analyzing flow periodicity and timing.
-- **Payload Carving**: Extracts HTTP file payloads for further inspection and hashing.
-- **OSINT Enrichment**: Integrates with top threat intelligence APIs to enrich IP and domain data:
-  - VirusTotal
-  - AbuseIPDB
-  - GreyNoise
-  - OTX (AlienVault)
-  - Shodan
-- **AI-Powered Reporting**: Generates executive summaries and detailed threat reports using local LLMs (via LM Studio) or OpenAI-compatible APIs.
-- **Interactive UI**: Built with [Streamlit](https://streamlit.io/) for easy visualization, configuration, and interaction.
+---
 
-## Installation
+## 🚀 Key Features
+
+### 1. 🧠 AI-Powered Threat Analysis
+- **Automated Reporting**: Generates professional, SOC-ready reports summarizing key findings, suspicious indicators, and risk assessments.
+- **Local & Cloud LLM Support**:
+  - **Local Privacy**: Fully compatible with local models via [LM Studio](https://lmstudio.ai/) (e.g., Llama 3, Mistral) for air-gapped or privacy-sensitive analysis.
+  - **Cloud Power**: Supports OpenAI-compatible APIs for leveraging larger models like GPT-4.
+- **Context-Aware**: The AI is fed a structured summary of network flows, Zeek logs, and OSINT data, acting as an expert co-pilot.
+
+### 2. 🔍 Deep Packet Inspection & Flow Analysis
+- **Multi-Engine Pipeline**: Uses **PyShark** for granular packet inspection and **Tshark** for high-speed statistics.
+- **Protocol Parsing**: Automatically extracts and visualizes metadata for major protocols:
+  - **HTTP**: Methods, URIs, User-Agents.
+  - **DNS**: Queries, responses, record types.
+  - **TLS/SSL**: Server names (SNI), certificate details.
+  - **SMB**: File shares and commands.
+
+### 3. 🛡️ Zeek Integration
+- **Automated Lifecycle**: Manages the execution of Zeek on uploaded PCAPs without requiring manual command-line intervention.
+- **Log Analysis**: Parses and correlates core Zeek logs into interactive data tables:
+  - `conn.log`: Connection summaries and state.
+  - `dns.log`: Name resolution activity.
+  - `http.log`: Web traffic details.
+  - `ssl.log`: Encrypted traffic metadata.
+
+### 4. 📡 C2 Beaconing Detection
+- **Heuristic Analysis**: Implements a statistical algorithm to detect Command & Control (C2) beaconing behavior.
+- **Scoring Engine**: Ranks flows based on:
+  - **Periodicity**: Regularity of communication intervals (low variance).
+  - **Jitter**: Randomization attempts by C2 agents.
+  - **Volume**: Consistency of payload sizes.
+
+### 5. 📦 Payload Carving & Forensics
+- **File Extraction**: Uses `tshark` to carve HTTP file bodies from the traffic.
+- **Artifact Hashing**: Automatically calculates SHA256 hashes of extracted files for reputation checking.
+- **Safe Storage**: Carved files are stored locally in a quarantined directory for manual analysis.
+
+### 6. 🌐 OSINT Enrichment
+Integrates with leading threat intelligence providers to validate indicators of compromise (IOCs):
+- **VirusTotal**: File hash and IP/Domain reputation.
+- **AbuseIPDB**: Crowdsourced IP abuse reports.
+- **GreyNoise**: Identification of internet background noise and scanners.
+- **OTX (AlienVault)**: Open Threat Exchange pulses and indicators.
+- **Shodan**: Internet-facing device details and open ports.
+
+---
+
+## 🛠️ Installation
 
 ### Prerequisites
-
-Ensure you have the following installed on your system:
-
 - **Python 3.10+**
-- **Zeek**: Network security monitor.
-  - macOS: `brew install zeek`
-  - Linux: Follow [Zeek installation guide](https://docs.zeek.org/en/master/install.html)
-- **Tshark** (Wireshark): Network protocol analyzer.
-  - macOS: `brew install wireshark`
-  - Linux: `sudo apt install tshark`
-- **LM Studio** (Optional): For running local LLMs. Download from [lmstudio.ai](https://lmstudio.ai/).
+- **Zeek**: `brew install zeek` (macOS) or via package manager (Linux).
+- **Tshark**: `brew install wireshark` (macOS) or `sudo apt install tshark` (Linux).
+- **LM Studio** (Optional): For local LLM inference.
 
-### Setup
-
-1. **Clone the repository**:
+### Quick Start
+1. **Clone the repo**:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/yourusername/pcap-hunter.git
    cd pcap-hunter
    ```
-
 2. **Install dependencies**:
-   You can use the provided `Makefile` to set up the environment:
    ```bash
    make install
    ```
-   Alternatively, manually create a virtual environment and install requirements:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-1. **Start the Application**:
+3. **Run the application**:
    ```bash
    make run
    ```
-   This command activates the virtual environment and launches the Streamlit app.
 
-2. **Upload Data**:
-   - Go to the **Upload** tab.
-   - Upload a `.pcap` file or specify a path to a local file.
+---
 
-3. **Configure Analysis**:
-   - **LLM Settings**: Configure your LLM endpoint (default is local LM Studio at `http://localhost:1234/v1`).
-   - **OSINT Keys**: Enter your API keys for VirusTotal, AbuseIPDB, etc., to enable enrichment.
-   - **Toggles**: Enable or disable specific analysis phases (e.g., skip Zeek or Carving if not needed).
+## 📖 Usage Guide
 
-4. **Run Analysis**:
-   - Click **Extract & Analyze**.
-   - Switch to the **Progress** tab to watch the pipeline steps: Packet Counting -> PyShark -> Zeek -> Beaconing -> Carving -> OSINT -> Reporting.
+1. **Upload**: Drag and drop a `.pcap` file in the **Upload** tab.
+2. **Configure**:
+   - Set your LLM endpoint (default: `http://localhost:1234/v1`).
+   - Add API keys for OSINT services (optional but recommended).
+   - Toggle specific analysis phases (e.g., disable "Carving" for faster processing).
+3. **Analyze**: Click **Extract & Analyze**.
+4. **Monitor**: Watch the **Progress** tab as the pipeline executes:
+   - *Packet Counting* -> *Parsing* -> *Zeek* -> *Beaconing* -> *Carving* -> *OSINT* -> *Reporting*.
+5. **Review**: Read the generated **Threat Report** and explore the raw data tables for deep dives.
 
-5. **View Report**:
-   - Once complete, an AI-generated report will appear, summarizing key findings, suspicious flows, and potential threats.
+---
 
-## Configuration
+## ⚙️ Configuration
+Defaults are managed in `app/config.py`. Key settings include:
+- `DATA_DIR`: Location for storing analysis artifacts (default: `./data`).
+- `DEFAULT_PYSHARK_LIMIT`: Max packets to parse deeply (default: 200,000).
+- `OSINT_TOP_IPS_DEFAULT`: Number of top talkers to enrich (default: 50).
 
-Configuration defaults are defined in `app/config.py`.
-- **Data Directory**: Analysis artifacts (Zeek logs, carved files) are stored in the `data/` directory relative to the project root.
-- **Limits**: Default packet limits and OSINT lookup counts can be adjusted in the UI or config file.
+## 🧑‍💻 Development
+- **Test**: `make test`
+- **Lint**: `make lint`
+- **Format**: `make format`
+- **Clean**: `make clean`
 
-## Development
-
-### Running Tests
-Run the unit test suite:
-```bash
-make test
-```
-
-### Linting and Formatting
-Check for code style issues:
-```bash
-make lint
-```
-Auto-format code:
-```bash
-make format
-```
-
-### Project Structure
-- `app/`: Main application source code.
-    - `main.py`: Streamlit entry point.
-    - `pipeline/`: Core analysis logic (Zeek, PyShark, Beaconing, OSINT).
-    - `ui/`: UI components and layout.
-    - `llm/`: LLM client and prompt construction.
-    - `utils/`: Helper functions.
-- `tests/`: Unit tests.
-- `data/`: Output directory for analysis artifacts (git-ignored).
+## 📄 License
+MIT License. See `LICENSE` for details.

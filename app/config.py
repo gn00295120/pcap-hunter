@@ -4,8 +4,8 @@ import pathlib
 
 APP_NAME = "PCAP Threat Hunting Workbench"
 
-# Directories inside the container
-DATA_DIR = pathlib.Path("/data")
+# Directories (local or container)
+DATA_DIR = pathlib.Path("data").resolve()
 CARVE_DIR = DATA_DIR / "carved"
 ZEEK_DIR = DATA_DIR / "zeek"
 

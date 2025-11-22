@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import shutil
 import subprocess
+from pathlib import Path
 
 import pandas as pd
 
@@ -11,11 +13,35 @@ from app.pipeline.state import PhaseHandle
 from app.utils.common import ensure_dir
 
 
-def run_zeek(pcap_path: str, out_dir: str, phase: PhaseHandle | None = None) -> dict[str,str]:
+def _find_bin(name: str) -> str | None:
+    # Check env var first
+    if name == "zeek" and os.environ.get("ZEEK_BIN"):
+        return os.environ["ZEEK_BIN"]
+
+    # Check PATH
+    path = shutil.which(name)
+    if path:
+        return path
+
+    # Check common locations
+    common_paths = [
+        f"/opt/zeek/bin/{name}",
+        f"/usr/local/zeek/bin/{name}",
+        f"/opt/homebrew/bin/{name}",
+        f"/usr/local/bin/{name}",
+        f"/Applications/Zeek.app/Contents/MacOS/{name}",
+    ]
+    for p in common_paths:
+        if Path(p).exists():
+            return p
+    return None
+
+
+def run_zeek(pcap_path: str, out_dir: str, phase: PhaseHandle | None = None) -> dict[str, str]:
     ensure_dir(out_dir)
-    zeek_bin = shutil.which("zeek") or "/opt/zeek/bin/zeek"
-    if not pathlib.Path(zeek_bin).exists():
-        raise FileNotFoundError(f"Zeek binary not found. Tried: {zeek_bin}")
+    zeek_bin = _find_bin("zeek")
+    if not zeek_bin:
+        raise FileNotFoundError("Zeek binary not found. Please install Zeek or set ZEEK_BIN env var.")
 
     if phase and phase.should_skip():
         phase.done("Zeek skipped.")
@@ -38,13 +64,14 @@ def run_zeek(pcap_path: str, out_dir: str, phase: PhaseHandle | None = None) -> 
             phase.set(60, "Zeek (ASCII) completed, collecting logs…")
 
     logs = {}
-    for name in ("conn.log","dns.log","http.log","ssl.log"):
+    for name in ("conn.log", "dns.log", "http.log", "ssl.log"):
         p = pathlib.Path(out_dir) / name
         if p.exists():
             logs[name] = str(p)
     if phase:
         phase.done("Zeek processing complete.")
     return logs
+
 
 def _load_json_lines(path: str) -> pd.DataFrame | None:
     lines = []
@@ -54,6 +81,7 @@ def _load_json_lines(path: str) -> pd.DataFrame | None:
             if s and not s.startswith("#"):
                 lines.append(json.loads(s))
     return pd.DataFrame(lines) if lines else None
+
 
 def _load_ascii(path: str) -> pd.DataFrame:
     cols = None
@@ -71,6 +99,7 @@ def _load_ascii(path: str) -> pd.DataFrame:
             if cols and len(parts) == len(cols):
                 records.append(dict(zip(cols, parts)))
     return pd.DataFrame(records)
+
 
 def load_zeek_any(path: str) -> pd.DataFrame:
     try:

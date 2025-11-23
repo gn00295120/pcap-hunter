@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import pathlib
-
-# Ensure top-level repo path importable
 import sys
 
+# Ensure top-level repo path importable
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 import os
@@ -17,11 +16,13 @@ from app import config as C
 from app.llm.client import generate_report
 from app.pipeline.beacon import rank_beaconing
 from app.pipeline.carve import carve_http_payloads
+from app.pipeline.geoip import GeoIP
 from app.pipeline.osint import enrich as osint_enrich
 from app.pipeline.pcap_count import count_packets_fast
 from app.pipeline.pyshark_pass import parse_pcap_pyshark
 from app.pipeline.state import PhaseTracker, end_run, is_run_active, reset_run_state
 from app.pipeline.zeek import load_zeek_any, run_zeek
+from app.ui.charts import plot_flow_timeline, plot_protocol_distribution, plot_world_map
 from app.ui.config_ui import init_config_defaults, render_config_tab
 from app.ui.layout import (
     inject_css,
@@ -90,7 +91,7 @@ st.title(C.APP_NAME)
 init_config_defaults()
 
 # Tabs
-tab_upload, tab_progress, tab_results, tab_config = make_tabs()
+tab_upload, tab_progress, tab_dashboard, tab_results, tab_config = make_tabs()
 
 # Defaults
 for k, v in [
@@ -393,7 +394,57 @@ with tab_progress:
     else:
         st.info("Start in **Upload** tab, then return here to track progress.")
 
-# ---------------------- 3) Results ----------------------
+# ---------------------- 3) Dashboard ----------------------
+with tab_dashboard:
+    st.markdown("### Dashboard")
+
+    feats = st.session_state.get("features") or {}
+    flows = feats.get("flows") or []
+
+    # 1. World Map
+    ip_locs = []
+    if flows:
+        # Collect all public IPs
+        ips = set()
+        for f in flows:
+            if f.get("src") and is_public_ipv4(f["src"]):
+                ips.add(f["src"])
+            if f.get("dst") and is_public_ipv4(f["dst"]):
+                ips.add(f["dst"])
+
+        # Lookup locations
+        for ip in ips:
+            loc = GeoIP.lookup(ip)
+            if loc:
+                ip_locs.append(loc)
+
+    if ip_locs:
+        st.plotly_chart(plot_world_map(ip_locs), use_container_width=True)
+    else:
+        st.info("No public IP locations found for map.")
+
+    col1, col2 = st.columns(2)
+
+    # 2. Protocol Distribution
+    with col1:
+        proto_counts = {}
+        for f in flows:
+            p = f.get("proto", "Unknown")
+            proto_counts[p] = proto_counts.get(p, 0) + 1
+
+        if proto_counts:
+            st.plotly_chart(plot_protocol_distribution(proto_counts), use_container_width=True)
+        else:
+            st.info("No protocol data available.")
+
+    # 3. Flow Timeline
+    with col2:
+        if flows:
+            st.plotly_chart(plot_flow_timeline(flows), use_container_width=True)
+        else:
+            st.info("No flow data available.")
+
+# ---------------------- 4) Raw Data ----------------------
 with tab_results:
     results_panel = make_results_panel(st.container())
     with results_panel:
@@ -401,10 +452,9 @@ with tab_results:
         render_zeek(results_panel, st.session_state.get("zeek_tables") or {})
         render_carved(results_panel, st.session_state.get("carved") or [])
         render_osint(results_panel, st.session_state.get("osint") or {"ips": {}, "domains": {}, "ja3": {}})
-        # The OSINT filtered preview & CSV (already present in your file) stays as-is
         render_report(results_panel, st.session_state.get("report"))
 
-# ---------------------- 4) Config ----------------------
+# ---------------------- 5) Config ----------------------
 with tab_config:
     render_config_tab()
 

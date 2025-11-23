@@ -35,9 +35,18 @@ def generate_report(base_url: str, api_key: str, model: str, context: Dict[str, 
     beacon = context.get("beaconing") or []
     carved = context.get("carved") or []
 
+    # Calculate protocol distribution for summary
+    flows = feats.get("flows") or []
+    proto_counts = {}
+    for f in flows:
+        p = f.get("proto", "Unknown")
+        proto_counts[p] = proto_counts.get(p, 0) + 1
+    top_protos = dict(sorted(proto_counts.items(), key=lambda x: x[1], reverse=True)[:5])
+
     summary = {
         "packet_count": context.get("packet_count"),
-        "flow_count": len(feats.get("flows") or []),
+        "flow_count": len(flows),
+        "top_protocols": top_protos,
         "artifact_counts": {k: len(v or []) for k, v in (feats.get("artifacts") or {}).items() if isinstance(v, list)},
         "zeek_tables": {k: len(v or []) for k, v in zeek.items()},
         "osint": {
@@ -52,7 +61,7 @@ def generate_report(base_url: str, api_key: str, model: str, context: Dict[str, 
 
     # --- Highlight samples ---
     highlights = {
-        "top_flows": (feats.get("flows") or [])[:5],
+        "top_flows": flows[:5],
         "sample_zeek": {k: (rows[:3] if isinstance(rows, list) else []) for k, rows in zeek.items()},
         "sample_osint_ips": list((osint.get("ips") or {}).keys())[:10],
         "sample_osint_domains": list((osint.get("domains") or {}).keys())[:10],

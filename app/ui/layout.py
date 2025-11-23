@@ -24,9 +24,9 @@ def inject_css():
 
 
 def make_tabs():
-    """Top tabs: Upload • Progress • Results • Config."""
-    tabs = st.tabs(["📤 Upload", "📈 Progress", "📊 Results", "⚙️ Config"])
-    return tabs[0], tabs[1], tabs[2], tabs[3]
+    """Top tabs: Upload • Progress • Dashboard • Results • Config."""
+    tabs = st.tabs(["📤 Upload", "📈 Progress", "📊 Dashboard", "📋 Raw Data", "⚙️ Config"])
+    return tabs[0], tabs[1], tabs[2], tabs[3], tabs[4]
 
 
 def make_progress_panel(container):

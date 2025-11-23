@@ -14,6 +14,14 @@ from app.utils.common import ensure_dir
 
 
 def _find_bin(name: str) -> str | None:
+    # Check session state config first
+    if name == "zeek":
+        import streamlit as st
+
+        cfg_bin = st.session_state.get("cfg_zeek_bin")
+        if cfg_bin and Path(cfg_bin).exists():
+            return cfg_bin
+
     # Check env var first
     if name == "zeek" and os.environ.get("ZEEK_BIN"):
         return os.environ["ZEEK_BIN"]

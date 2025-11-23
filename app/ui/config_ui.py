@@ -60,6 +60,18 @@ def render_config_tab():
         )
 
     st.markdown("---")
+    st.markdown("#### Binary Paths (optional)")
+    bp1, bp2 = st.columns(2)
+    with bp1:
+        st.session_state["cfg_zeek_bin"] = st.text_input(
+            "Zeek Binary Path", value=st.session_state.get("cfg_zeek_bin", ""), placeholder="Auto-detect"
+        )
+    with bp2:
+        st.session_state["cfg_tshark_bin"] = st.text_input(
+            "Tshark Binary Path", value=st.session_state.get("cfg_tshark_bin", ""), placeholder="Auto-detect"
+        )
+
+    st.markdown("---")
     st.markdown("#### Extraction / Analysis")
     st.session_state["cfg_limit_packets"] = st.number_input(
         "PyShark packet limit (0 = no limit)",

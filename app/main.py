@@ -419,7 +419,7 @@ with tab_dashboard:
                 ip_locs.append(loc)
 
     if ip_locs:
-        st.plotly_chart(plot_world_map(ip_locs), use_container_width=True)
+        st.plotly_chart(plot_world_map(ip_locs, flows=flows), use_container_width=True)
     else:
         st.info("No public IP locations found for map.")
 

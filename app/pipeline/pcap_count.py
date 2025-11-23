@@ -6,6 +6,14 @@ from pathlib import Path
 
 
 def _find_bin(name: str) -> str | None:
+    # Check session state config first
+    if name == "tshark":
+        import streamlit as st
+
+        cfg_bin = st.session_state.get("cfg_tshark_bin")
+        if cfg_bin and Path(cfg_bin).exists():
+            return cfg_bin
+
     # Check PATH first
     path = shutil.which(name)
     if path:

@@ -5,7 +5,7 @@ from typing import Any, Dict, Tuple
 import pyshark
 
 from app.pipeline.state import PhaseHandle
-from app.utils.common import uniq_sorted
+from app.utils.common import find_bin, uniq_sorted
 
 
 def parse_pcap_pyshark(
@@ -15,7 +15,8 @@ def parse_pcap_pyshark(
     total_packets: int | None,
     progress_every: int = 500,
 ) -> Dict[str, Any]:
-    cap = pyshark.FileCapture(pcap_path, keep_packets=False)
+    tshark_path = find_bin("tshark", cfg_key="cfg_tshark_bin")
+    cap = pyshark.FileCapture(pcap_path, keep_packets=False, tshark_path=tshark_path)
     out = {"flows": [], "artifacts": {"ips": set(), "domains": set(), "urls": set(), "hashes": set(), "ja3": set()}}
     flow_index: Dict[Tuple[str, str, str, str, str], int] = {}
     n = 0

@@ -85,13 +85,18 @@ def plot_world_map(ip_data: List[Dict[str, Any]], flows: List[Dict[str, Any]] = 
         showland=True,
         landcolor="#222",
         bgcolor="#000",
-        projection_type="natural earth",
+        projection_type="equirectangular",
+        lataxis_range=[-60, 90],  # Cut off Antarctica to save space
     )
     fig.update_layout(
         title="Global Traffic Origins & Connectivity",
         template="plotly_dark",
         margin={"r": 0, "t": 30, "l": 0, "b": 0},
         height=400,  # Fixed height
+        geo=dict(
+            projection_scale=1.1,  # Slight zoom to fill width
+            center=dict(lat=20, lon=0),
+        ),
     )
     return fig
 

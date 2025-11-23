@@ -1,53 +1,18 @@
 from __future__ import annotations
 
 import json
-import os
 import pathlib
-import shutil
 import subprocess
-from pathlib import Path
 
 import pandas as pd
 
 from app.pipeline.state import PhaseHandle
-from app.utils.common import ensure_dir
-
-
-def _find_bin(name: str) -> str | None:
-    # Check session state config first
-    if name == "zeek":
-        import streamlit as st
-
-        cfg_bin = st.session_state.get("cfg_zeek_bin")
-        if cfg_bin and Path(cfg_bin).exists():
-            return cfg_bin
-
-    # Check env var first
-    if name == "zeek" and os.environ.get("ZEEK_BIN"):
-        return os.environ["ZEEK_BIN"]
-
-    # Check PATH
-    path = shutil.which(name)
-    if path:
-        return path
-
-    # Check common locations
-    common_paths = [
-        f"/opt/zeek/bin/{name}",
-        f"/usr/local/zeek/bin/{name}",
-        f"/opt/homebrew/bin/{name}",
-        f"/usr/local/bin/{name}",
-        f"/Applications/Zeek.app/Contents/MacOS/{name}",
-    ]
-    for p in common_paths:
-        if Path(p).exists():
-            return p
-    return None
+from app.utils.common import ensure_dir, find_bin
 
 
 def run_zeek(pcap_path: str, out_dir: str, phase: PhaseHandle | None = None) -> dict[str, str]:
     ensure_dir(out_dir)
-    zeek_bin = _find_bin("zeek")
+    zeek_bin = find_bin("zeek", env_key="ZEEK_BIN", cfg_key="cfg_zeek_bin")
     if not zeek_bin:
         raise FileNotFoundError("Zeek binary not found. Please install Zeek or set ZEEK_BIN env var.")
 

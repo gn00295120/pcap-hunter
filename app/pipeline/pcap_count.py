@@ -1,33 +1,13 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
-from pathlib import Path
 
-
-def _find_bin(name: str) -> str | None:
-    # Check session state config first
-    if name == "tshark":
-        import streamlit as st
-
-        cfg_bin = st.session_state.get("cfg_tshark_bin")
-        if cfg_bin and Path(cfg_bin).exists():
-            return cfg_bin
-
-    # Check PATH first
-    path = shutil.which(name)
-    if path:
-        return path
-    # Check standard macOS Wireshark location
-    mac_path = Path(f"/Applications/Wireshark.app/Contents/MacOS/{name}")
-    if mac_path.exists():
-        return str(mac_path)
-    return None
+from app.utils.common import find_bin
 
 
 def count_packets_fast(pcap_path: str) -> int | None:
     # Try capinfos first (fastest)
-    capinfos = _find_bin("capinfos")
+    capinfos = find_bin("capinfos")
     if capinfos:
         try:
             # -T: Table output, -r: Headerless, -c: Count
@@ -45,7 +25,7 @@ def count_packets_fast(pcap_path: str) -> int | None:
             pass
 
     # Fallback to tshark
-    tshark = _find_bin("tshark")
+    tshark = find_bin("tshark", cfg_key="cfg_tshark_bin")
     if tshark:
         try:
             # tshark -r file -T fields -e frame.number | wc -l

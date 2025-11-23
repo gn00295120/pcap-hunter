@@ -31,3 +31,53 @@ def is_public_ipv4(s: str) -> bool:
         return isinstance(ip, ipaddress.IPv4Address) and ip.is_global
     except Exception:
         return False
+
+
+def find_bin(name: str, env_key: str = "", cfg_key: str = "") -> str | None:
+    """
+    Find a binary by name, checking:
+    1. Streamlit session state config (if cfg_key provided)
+    2. Environment variable (if env_key provided)
+    3. PATH
+    4. Common macOS locations
+    """
+    import os
+    import shutil
+    from pathlib import Path
+
+    # 1. Config
+    if cfg_key:
+        try:
+            import streamlit as st
+
+            val = st.session_state.get(cfg_key)
+            if val and Path(val).exists():
+                return val
+        except ImportError:
+            pass
+
+    # 2. Env var
+    if env_key:
+        val = os.environ.get(env_key)
+        if val and Path(val).exists():
+            return val
+
+    # 3. PATH
+    path = shutil.which(name)
+    if path:
+        return path
+
+    # 4. Common locations
+    common_paths = [
+        f"/Applications/Wireshark.app/Contents/MacOS/{name}",
+        f"/Applications/Zeek.app/Contents/MacOS/{name}",
+        f"/opt/zeek/bin/{name}",
+        f"/usr/local/zeek/bin/{name}",
+        f"/opt/homebrew/bin/{name}",
+        f"/usr/local/bin/{name}",
+    ]
+    for p in common_paths:
+        if Path(p).exists():
+            return p
+
+    return None

@@ -22,11 +22,7 @@ def plot_world_map(ip_data: List[Dict[str, Any]], flows: List[Dict[str, Any]] = 
 
     # Aggregate by location to size markers
     # We also want to keep a list of IPs for each location to help with filtering
-    df_agg = (
-        df.groupby(["lat", "lon", "city", "country"])
-        .agg({"count": "sum", "ip": lambda x: list(x)})
-        .reset_index()
-    )
+    df_agg = df.groupby(["lat", "lon", "city", "country"]).agg({"count": "sum", "ip": lambda x: list(x)}).reset_index()
 
     fig = go.Figure()
 
@@ -124,7 +120,7 @@ def plot_world_map(ip_data: List[Dict[str, Any]], flows: List[Dict[str, Any]] = 
             projection_scale=1.1,
             center=dict(lat=20, lon=0),
         ),
-        legend=dict(orientation="h", yanchor="bottom", y=0, xanchor="right", x=1)
+        legend=dict(orientation="h", yanchor="bottom", y=0, xanchor="right", x=1),
     )
     return fig
 

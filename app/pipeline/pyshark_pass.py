@@ -149,9 +149,9 @@ def parse_pcap_pyshark(
                 # If we terminated early, returncode might be non-zero (SIGTERM)
                 # But if we didn't terminate and it failed:
                 if not (limit_packets and n >= limit_packets) and not (phase and phase.should_skip()):
-                     stderr = proc.stderr.read()
-                     if stderr:
-                         log_runtime_error(f"Tshark failed: {stderr}")
+                    stderr = proc.stderr.read()
+                    if stderr:
+                        log_runtime_error(f"Tshark failed: {stderr}")
 
         finally:
             if proc:

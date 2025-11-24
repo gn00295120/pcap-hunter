@@ -70,6 +70,7 @@ def render_config_tab():
 
         # Check status
         from app.utils.common import find_bin
+
         resolved_zeek = find_bin("zeek", env_key="ZEEK_BIN", cfg_key="cfg_zeek_bin")
         if resolved_zeek:
             st.success(f"Found: `{resolved_zeek}`")

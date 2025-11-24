@@ -429,7 +429,7 @@ with tab_dashboard:
             width="stretch",
             on_select="rerun",
             selection_mode=["points", "box", "lasso"],
-            key=f"map_select_{st.session_state.get('map_reset_counter', 0)}"
+            key=f"map_select_{st.session_state.get('map_reset_counter', 0)}",
         )
 
         # Handle selection
@@ -444,6 +444,7 @@ with tab_dashboard:
 
     # Filter flows based on selection
     from app.utils.common import filter_flows_by_ips
+
     filtered_flows = filter_flows_by_ips(flows, selected_ips)
 
     if selected_ips:

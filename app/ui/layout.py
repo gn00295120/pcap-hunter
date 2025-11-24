@@ -24,9 +24,9 @@ def inject_css():
 
 
 def make_tabs():
-    """Top tabs: Upload • Progress • Dashboard • Results • Config."""
-    tabs = st.tabs(["📤 Upload", "📈 Progress", "📊 Dashboard", "📋 Raw Data", "⚙️ Config"])
-    return tabs[0], tabs[1], tabs[2], tabs[3], tabs[4]
+    """Top tabs: Upload • Progress • Dashboard • OSINT • Results • Config."""
+    tabs = st.tabs(["📤 Upload", "📈 Progress", "📊 Dashboard", "🕵️ OSINT", "📋 Raw Data", "⚙️ Config"])
+    return tabs[0], tabs[1], tabs[2], tabs[3], tabs[4], tabs[5]
 
 
 def make_progress_panel(container):
@@ -89,23 +89,134 @@ def render_carved(result_col, carved):
                 st.caption("No HTTP payloads carved.")
 
 
+@st.dialog("WHOIS Info")
+def show_whois_dialog(target: str):
+    from app.utils.common import get_whois_info
+
+    with st.spinner(f"Fetching WHOIS for {target}..."):
+        info = get_whois_info(target)
+
+    if not isinstance(info, dict):
+        st.error(str(info))
+        return
+
+    # Helper to safely get string or first item of list
+    def _s(val):
+        if isinstance(val, list):
+            return str(val[0]) if val else "n/a"
+        return str(val) if val else "n/a"
+
+    # Helper to format dates
+    def _d(val):
+        if isinstance(val, list):
+            val = val[0] if val else None
+        return str(val).split(" ")[0] if val else "n/a"
+
+    # Header
+    st.subheader(f"Domain: {info.get('domain_name', target)}")
+
+    # Key Metrics
+    st.text_input("Registrar", value=_s(info.get("registrar")), disabled=True)
+    st.text_input("Created", value=_d(info.get("creation_date")), disabled=True)
+    st.text_input("Expires", value=_d(info.get("expiration_date")), disabled=True)
+
+    st.divider()
+
+    # Registrant Info
+    st.markdown("**Registrant Details**")
+    rc1, rc2 = st.columns(2)
+    with rc1:
+        st.text_input("Name", value=_s(info.get("name")), disabled=True)
+        st.text_input("Organization", value=_s(info.get("org")), disabled=True)
+    with rc2:
+        st.text_input("Email", value=_s(info.get("emails")), disabled=True)
+        st.text_input("Country", value=_s(info.get("country")), disabled=True)
+
+    # Location
+    if info.get("city") or info.get("state"):
+        st.caption(f"Location: {_s(info.get('city'))}, {_s(info.get('state'))}")
+
+    # Name Servers
+    if info.get("name_servers"):
+        st.markdown("**Name Servers**")
+        ns = info["name_servers"]
+        if isinstance(ns, list):
+            for n in ns:
+                st.markdown(f"- `{n}`")
+        else:
+            st.markdown(f"- `{ns}`")
+
+    st.divider()
+    with st.expander("Raw Data"):
+        st.json(info)
+
+
 def render_osint(result_col, osint_data):
     with result_col:
-        with st.expander("OSINT findings", expanded=bool(osint_data.get("ips") or osint_data.get("domains"))):
-            cols = st.columns(2)
-            with cols[0]:
-                st.write("**IPs**")
-                for ip, obj in (osint_data.get("ips") or {}).items():
-                    vt_attr = (obj.get("vt") or {}).get("data", {}).get("attributes", {})
-                    vt_rep = vt_attr.get("reputation", "n/a")
-                    gn = (obj.get("greynoise") or {}).get("classification", "n/a")
-                    st.markdown(f"- `{ip}` — GN: {gn}, VT rep: {vt_rep}")
-            with cols[1]:
-                st.write("**Domains**")
-                for dom, obj in (osint_data.get("domains") or {}).items():
-                    vt_attr = (obj.get("vt") or {}).get("data", {}).get("attributes", {})
-                    cats = vt_attr.get("categories", "n/a")
-                    st.markdown(f"- `{dom}` — VT cat: {cats}")
+        # Use tabs instead of columns for better space
+        tab_ips, tab_doms = st.tabs(["IP Addresses", "Domains"])
+
+        # IPs Tab
+        with tab_ips:
+            st.caption("Select a row to view WHOIS information.")
+            ip_rows = []
+            for ip, obj in (osint_data.get("ips") or {}).items():
+                vt_attr = (obj.get("vt") or {}).get("data", {}).get("attributes", {})
+                vt_rep = vt_attr.get("reputation", "n/a")
+                gn = (obj.get("greynoise") or {}).get("classification", "n/a")
+                ptr = obj.get("ptr", "n/a")
+                ip_rows.append({
+                    "IP": ip,
+                    "PTR": ptr,
+                    "GreyNoise": gn,
+                    "VT Rep": vt_rep
+                })
+
+            if ip_rows:
+                df_ips = pd.DataFrame(ip_rows)
+                event = st.dataframe(
+                    df_ips,
+                    width="stretch",
+                    hide_index=True,
+                    on_select="rerun",
+                    selection_mode="single-row",
+                    key=f"osint_ips_{len(ip_rows)}"
+                )
+                if event.selection.rows:
+                    idx = event.selection.rows[0]
+                    target_ip = df_ips.iloc[idx]["IP"]
+                    show_whois_dialog(target_ip)
+            else:
+                st.info("No public IP findings.")
+
+        # Domains Tab
+        with tab_doms:
+            st.caption("Select a row to view WHOIS information.")
+            dom_rows = []
+            for dom, obj in (osint_data.get("domains") or {}).items():
+                vt_attr = (obj.get("vt") or {}).get("data", {}).get("attributes", {})
+                cats = vt_attr.get("categories", "n/a")
+                dom_rows.append({
+                    "Domain": dom,
+                    "VT Categories": str(cats)
+                })
+
+            if dom_rows:
+                df_doms = pd.DataFrame(dom_rows)
+                event = st.dataframe(
+                    df_doms,
+                    width="stretch",
+                    hide_index=True,
+                    on_select="rerun",
+                    selection_mode="single-row",
+                    key=f"osint_doms_{len(dom_rows)}"
+                )
+                if event.selection.rows:
+                    idx = event.selection.rows[0]
+                    target_dom = df_doms.iloc[idx]["Domain"]
+                    show_whois_dialog(target_dom)
+            else:
+                st.info("No domain findings.")
 
 
 def render_report(result_col, report_md):

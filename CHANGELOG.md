@@ -29,3 +29,23 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **Crash on Map Reset**: Fixed `StreamlitValueAssignmentNotAllowedError` by using a dynamic widget key for the map, ensuring clean resets.
 - **Binary Detection**: Resolved issues where `tshark` and `zeek` were not found even when installed.
+
+### [0.2.0] - 2025-11-24
+### Added
+- **WHOIS Lookup**:
+    - Interactive WHOIS modal for IPs and Domains in the OSINT tab.
+    - Displays Registrar, Dates, Registrant Info, and Name Servers in a structured layout.
+    - Powered by `python-whois` with robust error handling.
+- **Reverse DNS**: Added PTR record resolution for public IPs in the OSINT enrichment pipeline.
+- **OSINT Tab**: Moved OSINT findings to a dedicated tab with separate views for "IP Addresses" and "Domains".
+- **Zeek DNS Integration**: Automatically merges domains found in Zeek's `dns.log` into the OSINT artifacts list.
+
+### Changed
+- **UI Layout**:
+    - Reorganized main tabs to include "🕵️ OSINT".
+    - OSINT results now use interactive DataFrames with click-to-view functionality.
+    - WHOIS dialog layout improved to stack fields vertically for better readability.
+
+### Fixed
+- **Missing Domains**: Resolved issue where domains from Zeek logs were not appearing in OSINT results.
+- **IP WHOIS**: Fixed failures when querying WHOIS for IP addresses by improving the lookup logic and error handling.

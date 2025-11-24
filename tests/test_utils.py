@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 from app.utils.common import is_public_ipv4, make_slug, uniq_sorted
 
 
@@ -43,3 +45,38 @@ def test_filter_flows_by_ips():
     assert len(filter_flows_by_ips(flows, {"9.9.9.9"})) == 0
     assert uniq_sorted([]) == []
     assert uniq_sorted(None) == []
+
+
+def test_resolve_ip():
+    from app.utils.common import resolve_ip
+
+    # Test success
+    with patch("socket.gethostbyaddr", return_value=("google-public-dns-a.google.com", [], ["8.8.8.8"])):
+        assert resolve_ip("8.8.8.8") == "google-public-dns-a.google.com"
+
+    # Test failure
+    with patch("socket.gethostbyaddr", side_effect=Exception("Host not found")):
+        assert resolve_ip("1.2.3.4") is None
+
+
+def test_get_whois_info():
+    from app.utils.common import get_whois_info
+
+    # Test success (dict)
+    with patch("whois.whois", return_value={"domain_name": "example.com"}):
+        info = get_whois_info("example.com")
+        assert isinstance(info, dict)
+        assert info["domain_name"] == "example.com"
+
+    # Test success (object with text)
+    mock_w = MagicMock()
+    mock_w.text = "Domain Name: EXAMPLE.COM"
+    with patch("whois.whois", return_value=mock_w):
+        info = get_whois_info("example.com")
+        assert info == mock_w
+
+    # Test failure
+    with patch("whois.whois", side_effect=Exception("Lookup failed")):
+        info = get_whois_info("example.com")
+        assert isinstance(info, str)
+        assert "WHOIS lookup failed" in info

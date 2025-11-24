@@ -91,7 +91,7 @@ st.title(C.APP_NAME)
 init_config_defaults()
 
 # Tabs
-tab_upload, tab_progress, tab_dashboard, tab_results, tab_config = make_tabs()
+tab_upload, tab_progress, tab_dashboard, tab_osint, tab_results, tab_config = make_tabs()
 
 # Defaults
 for k, v in [
@@ -276,6 +276,11 @@ with tab_progress:
                     else "Zeek skipped."
                 )
             st.session_state["zeek_tables"] = zeek_tables
+
+            # Merge Zeek DNS queries into artifacts
+            from app.pipeline.zeek import merge_zeek_dns
+            features = merge_zeek_dns(zeek_tables, features)
+            st.session_state["features"] = features
 
         # Beaconing
         p = tracker.next_phase("Beaconing ranking")
@@ -481,16 +486,20 @@ with tab_dashboard:
     st.markdown("---")
     render_report(st.container(), st.session_state.get("report"))
 
-# ---------------------- 4) Raw Data ----------------------
+# 4) OSINT ----------------------
+with tab_osint:
+    st.markdown("### OSINT Investigation")
+    render_osint(st.container(), st.session_state.get("osint") or {"ips": {}, "domains": {}, "ja3": {}})
+
+# 5) Raw Data ----------------------
 with tab_results:
     results_panel = make_results_panel(st.container())
     with results_panel:
         render_overview(results_panel, st.session_state.get("features"))
         render_zeek(results_panel, st.session_state.get("zeek_tables") or {})
         render_carved(results_panel, st.session_state.get("carved") or [])
-        render_osint(results_panel, st.session_state.get("osint") or {"ips": {}, "domains": {}, "ja3": {}})
 
-# ---------------------- 5) Config ----------------------
+# 5) Config ----------------------
 with tab_config:
     render_config_tab()
 

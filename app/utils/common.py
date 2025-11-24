@@ -3,10 +3,40 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import pathlib
+import socket
 
 
 def sha256_bytes(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
+
+
+def resolve_ip(ip: str) -> str | None:
+    """Resolve IP to domain name (Reverse DNS)."""
+    try:
+        return socket.gethostbyaddr(ip)[0]
+    except Exception:
+        return None
+
+
+def get_whois_info(target: str) -> dict | str:
+    """
+    Retrieve WHOIS information for a domain or IP.
+    Returns a dictionary or string depending on the library output,
+    or an error message string on failure.
+    """
+    import whois
+
+    try:
+        # whois.whois supports both domains and IPs
+        w = whois.whois(target)
+
+        # Convert to dict if it's a specific object
+        if hasattr(w, "text"):
+            return w
+        return dict(w)
+    except Exception as e:
+        # Fallback: sometimes it fails for IPs, we can try to return a partial object or just the error
+        return f"WHOIS lookup failed for {target}: {e}"
 
 
 def filter_flows_by_ips(flows: list[dict], selected_ips: set[str]) -> list[dict]:

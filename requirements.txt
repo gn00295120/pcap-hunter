@@ -32,3 +32,4 @@ pytest-cov>=4.1
 plotly
 maxminddb-geolite2>=4.1
 ruff>=0.3.0
+python-whois>=0.9

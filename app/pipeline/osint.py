@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 from app.pipeline.state import PhaseHandle
 from app.security.opsec import hardened_session
-from app.utils.common import is_public_ipv4
+from app.utils.common import is_public_ipv4, resolve_ip
 
 S = hardened_session(timeout=12)
 
@@ -64,6 +64,12 @@ def enrich(
             obj["vt"] = _j(f"https://www.virustotal.com/api/v3/ip_addresses/{ip}", headers={"x-apikey": keys["VT_KEY"]})
         if keys.get("SHODAN_KEY"):
             obj["shodan"] = _j(f"https://api.shodan.io/shodan/host/{ip}", params={"key": keys["SHODAN_KEY"]})
+
+        # Reverse DNS
+        ptr = resolve_ip(ip)
+        if ptr:
+            obj["ptr"] = ptr
+
         res["ips"][ip] = obj
         tick(f"OSINT IP {ip}")
         time.sleep(throttle)

@@ -10,7 +10,7 @@ CARVE_DIR = DATA_DIR / "carved"
 ZEEK_DIR = DATA_DIR / "zeek"
 
 # LM Studio defaults
-LM_BASE_URL = "http://host.docker.internal:1234/v1"
+LM_BASE_URL = "http://localhost:1234/v1"
 LM_API_KEY = "lm-studio"  # LM Studio doesn’t enforce this; just needs a non-empty string
 LM_MODEL = "local"
 

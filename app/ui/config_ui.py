@@ -63,13 +63,30 @@ def render_config_tab():
     st.markdown("#### Binary Paths (optional)")
     bp1, bp2 = st.columns(2)
     with bp1:
-        st.session_state["cfg_zeek_bin"] = st.text_input(
+        zeek_path = st.text_input(
             "Zeek Binary Path", value=st.session_state.get("cfg_zeek_bin", ""), placeholder="Auto-detect"
         )
+        st.session_state["cfg_zeek_bin"] = zeek_path
+
+        # Check status
+        from app.utils.common import find_bin
+        resolved_zeek = find_bin("zeek", env_key="ZEEK_BIN", cfg_key="cfg_zeek_bin")
+        if resolved_zeek:
+            st.success(f"Found: `{resolved_zeek}`")
+        else:
+            st.error("Not found. Install Zeek or set path.")
+
     with bp2:
-        st.session_state["cfg_tshark_bin"] = st.text_input(
+        tshark_path = st.text_input(
             "Tshark Binary Path", value=st.session_state.get("cfg_tshark_bin", ""), placeholder="Auto-detect"
         )
+        st.session_state["cfg_tshark_bin"] = tshark_path
+
+        resolved_tshark = find_bin("tshark", cfg_key="cfg_tshark_bin")
+        if resolved_tshark:
+            st.success(f"Found: `{resolved_tshark}`")
+        else:
+            st.error("Not found. Install Wireshark/Tshark.")
 
     st.markdown("---")
     st.markdown("#### Extraction / Analysis")
@@ -82,7 +99,7 @@ def render_config_tab():
     tc1, tc2, tc3, tc4 = st.columns(4)
     with tc1:
         st.session_state["cfg_do_pyshark"] = st.checkbox(
-            "Run PyShark", value=bool(st.session_state.get("cfg_do_pyshark", True))
+            "Run Packet Parsing (Tshark)", value=bool(st.session_state.get("cfg_do_pyshark", True))
         )
     with tc2:
         st.session_state["cfg_do_zeek"] = st.checkbox("Run Zeek", value=bool(st.session_state.get("cfg_do_zeek", True)))
@@ -116,3 +133,11 @@ def render_config_tab():
             init_config_defaults()
             st.success("Config reset to defaults.")
             st.rerun()
+
+    st.markdown("---")
+    with st.expander("Runtime Logs"):
+        logs = st.session_state.get("runtime_logs", [])
+        if logs:
+            st.code("\n".join(logs))
+        else:
+            st.info("No runtime logs.")

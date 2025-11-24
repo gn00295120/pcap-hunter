@@ -1,0 +1,75 @@
+from app.ui.charts import plot_flow_timeline, plot_protocol_distribution, plot_world_map
+
+
+def test_plot_world_map_empty():
+    fig = plot_world_map([], [])
+    assert fig.layout.title.text is None  # Or check if it returns empty figure structure
+    assert len(fig.data) == 0
+
+def test_plot_world_map_markers():
+    ip_data = [
+        {"ip": "1.1.1.1", "country": "US", "city": "TestCity", "lat": 10.0, "lon": 20.0},
+        {"ip": "2.2.2.2", "country": "US", "city": "TestCity", "lat": 10.0, "lon": 20.0},
+    ]
+    fig = plot_world_map(ip_data, [])
+
+    # Should have 1 trace for markers
+    assert len(fig.data) == 1
+    trace = fig.data[0]
+    assert trace.type == "scattergeo"
+    assert trace.mode is None # defaults
+    # Check customdata
+    assert "1.1.1.1" in trace.customdata[0]
+    assert "2.2.2.2" in trace.customdata[0]
+    # Check aggregation (2 IPs in same city = count 2)
+    assert "2)" in trace.text[0]
+
+def test_plot_world_map_lines_variable_width():
+    ip_data = [
+        {"ip": "1.1.1.1", "lat": 0, "lon": 0, "city": "A", "country": "A"},
+        {"ip": "2.2.2.2", "lat": 10, "lon": 10, "city": "B", "country": "B"},
+        {"ip": "3.3.3.3", "lat": 20, "lon": 20, "city": "C", "country": "C"},
+    ]
+    # Create flows with different counts to trigger variable widths
+    flows = [
+        {"src": "1.1.1.1", "dst": "2.2.2.2", "count": 10},  # Low
+        {"src": "2.2.2.2", "dst": "3.3.3.3", "count": 1000}, # High
+    ]
+
+    fig = plot_world_map(ip_data, flows)
+
+    # 1 marker trace + at least 2 line traces (different widths)
+    # Note: The exact binning depends on the max count.
+    # Max = 1000.
+    # T1 = 330, T2 = 660.
+    # 10 is < 330 -> Low (width 1)
+    # 1000 is > 660 -> High (width 5)
+    # So we expect 2 line traces.
+
+    assert len(fig.data) >= 3 # 1 marker + 2 lines
+
+    widths = set()
+    for trace in fig.data:
+        if trace.mode == "lines":
+            widths.add(trace.line.width)
+
+    assert 1 in widths
+    assert 5 in widths
+
+def test_plot_protocol_distribution():
+    counts = {"TCP": 10, "UDP": 5}
+    fig = plot_protocol_distribution(counts)
+    assert len(fig.data) == 1
+    assert fig.data[0].type == "pie"
+    assert list(fig.data[0].values) == [10, 5]
+
+def test_plot_flow_timeline():
+    flows = [
+        {"pkt_times": [100, 105], "proto": "TCP", "count": 5, "src": "1.1.1.1", "dst": "2.2.2.2"},
+        {"pkt_times": [110, 110], "proto": "UDP", "count": 1, "src": "3.3.3.3", "dst": "4.4.4.4"},
+    ]
+    fig = plot_flow_timeline(flows)
+    assert len(fig.data) > 0
+    # Check total points across all traces
+    total_points = sum(len(trace.x) for trace in fig.data)
+    assert total_points == 2

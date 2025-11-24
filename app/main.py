@@ -102,6 +102,8 @@ for k, v in [
     ("zeek_tables", {}),
     ("carved", []),
     ("__total_pkts", None),
+    ("runtime_logs", []),
+    ("map_reset_counter", 0),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -134,7 +136,7 @@ with tab_upload:
 
     phases = [
         ("Packet counting (tshark)", pre_count and do_pyshark),
-        ("PyShark parsing", do_pyshark),
+        ("Parsing Packets", do_pyshark),
         ("Zeek processing", do_zeek),
         ("Beaconing ranking", True),
         ("HTTP carving (tshark)", do_carve),
@@ -142,7 +144,7 @@ with tab_upload:
         ("LLM report", True),
     ]
 
-    start = st.button("Extract & Analyze", type="primary", use_container_width="strech")
+    start = st.button("Extract & Analyze", type="primary", use_container_width=True)
     if start:
         if not pcap_path or not pathlib.Path(pcap_path).exists():
             st.error("Please upload a PCAP or provide a valid path.")
@@ -191,7 +193,7 @@ with tab_progress:
 
         phases = [
             ("Packet counting (tshark)", pre_count and do_pyshark),
-            ("PyShark parsing", do_pyshark),
+            ("Parsing Packets", do_pyshark),
             ("Zeek processing", do_zeek),
             ("Beaconing ranking", True),
             ("HTTP carving (tshark)", do_carve),
@@ -229,11 +231,11 @@ with tab_progress:
                     p.done("Counting skipped.")
 
         # PyShark
-        if dict(phases).get("PyShark parsing", False):
-            p = tracker.next_phase("PyShark parsing")
-            if not st.session_state.get(f"done_{make_slug('PyShark parsing')}", False):
-                if not st.session_state.get(f"skip_{make_slug('PyShark parsing')}", False):
-                    with st.spinner("PyShark parsing…"):
+        if dict(phases).get("Parsing Packets", False):
+            p = tracker.next_phase("Parsing Packets")
+            if not st.session_state.get(f"done_{make_slug('Parsing Packets')}", False):
+                if not st.session_state.get(f"skip_{make_slug('Parsing Packets')}", False):
+                    with st.spinner("Parsing packets…"):
                         features = parse_pcap_pyshark(
                             pcap_path,
                             limit_packets=limit_packets,
@@ -242,9 +244,9 @@ with tab_progress:
                             progress_every=250,
                         )
                 p.done(
-                    "PyShark parsing complete."
-                    if not st.session_state.get(f"skip_{make_slug('PyShark parsing')}", False)
-                    else "PyShark skipped."
+                    "Packet parsing complete."
+                    if not st.session_state.get(f"skip_{make_slug('Parsing Packets')}", False)
+                    else "Parsing skipped."
                 )
             st.session_state["features"] = features
 
@@ -395,6 +397,7 @@ with tab_progress:
         st.info("Start in **Upload** tab, then return here to track progress.")
 
 # ---------------------- 3) Dashboard ----------------------
+# ---------------------- 3) Dashboard ----------------------
 with tab_dashboard:
     st.markdown("### Dashboard")
 
@@ -418,31 +421,64 @@ with tab_dashboard:
             if loc:
                 ip_locs.append(loc)
 
+    selected_ips = set()
     if ip_locs:
-        st.plotly_chart(plot_world_map(ip_locs, flows=flows), use_container_width=True)
+        # Render map with selection enabled
+        map_event = st.plotly_chart(
+            plot_world_map(ip_locs, flows=flows),
+            width="stretch",
+            on_select="rerun",
+            selection_mode=["points", "box", "lasso"],
+            key=f"map_select_{st.session_state.get('map_reset_counter', 0)}"
+        )
+
+        # Handle selection
+        if map_event and "selection" in map_event:
+            points = map_event["selection"].get("points", [])
+            for p in points:
+                # customdata contains the list of IPs for that location
+                if "customdata" in p:
+                    selected_ips.update(p["customdata"])
     else:
         st.info("No public IP locations found for map.")
+
+    # Filter flows based on selection
+    from app.utils.common import filter_flows_by_ips
+    filtered_flows = filter_flows_by_ips(flows, selected_ips)
+
+    if selected_ips:
+        st.caption(f"Filtered: {len(filtered_flows)} flows involving {len(selected_ips)} selected IPs.")
+        st.button(
+            "Clear Selection",
+            type="primary",
+            on_click=lambda: st.session_state.update(
+                {"map_reset_counter": st.session_state.get("map_reset_counter", 0) + 1}
+            ),
+        )
 
     col1, col2 = st.columns(2)
 
     # 2. Protocol Distribution
     with col1:
         proto_counts = {}
-        for f in flows:
+        for f in filtered_flows:
             p = f.get("proto", "Unknown")
             proto_counts[p] = proto_counts.get(p, 0) + 1
 
         if proto_counts:
-            st.plotly_chart(plot_protocol_distribution(proto_counts), use_container_width=True)
+            st.plotly_chart(plot_protocol_distribution(proto_counts), width="stretch")
         else:
             st.info("No protocol data available.")
 
     # 3. Flow Timeline
     with col2:
-        if flows:
-            st.plotly_chart(plot_flow_timeline(flows), use_container_width=True)
+        if filtered_flows:
+            st.plotly_chart(plot_flow_timeline(filtered_flows), width="stretch")
         else:
             st.info("No flow data available.")
+
+    st.markdown("---")
+    render_report(st.container(), st.session_state.get("report"))
 
 # ---------------------- 4) Raw Data ----------------------
 with tab_results:
@@ -452,7 +488,6 @@ with tab_results:
         render_zeek(results_panel, st.session_state.get("zeek_tables") or {})
         render_carved(results_panel, st.session_state.get("carved") or [])
         render_osint(results_panel, st.session_state.get("osint") or {"ips": {}, "domains": {}, "ja3": {}})
-        render_report(results_panel, st.session_state.get("report"))
 
 # ---------------------- 5) Config ----------------------
 with tab_config:

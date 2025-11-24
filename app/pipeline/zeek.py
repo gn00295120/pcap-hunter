@@ -8,13 +8,16 @@ import pandas as pd
 
 from app.pipeline.state import PhaseHandle
 from app.utils.common import ensure_dir, find_bin
+from app.utils.logger import log_runtime_error
 
 
 def run_zeek(pcap_path: str, out_dir: str, phase: PhaseHandle | None = None) -> dict[str, str]:
     ensure_dir(out_dir)
     zeek_bin = find_bin("zeek", env_key="ZEEK_BIN", cfg_key="cfg_zeek_bin")
     if not zeek_bin:
-        raise FileNotFoundError("Zeek binary not found. Please install Zeek or set ZEEK_BIN env var.")
+        msg = "Zeek binary not found. Please install Zeek or set ZEEK_BIN env var."
+        log_runtime_error(msg)
+        raise FileNotFoundError(msg)
 
     if phase and phase.should_skip():
         phase.done("Zeek skipped.")
@@ -29,12 +32,19 @@ def run_zeek(pcap_path: str, out_dir: str, phase: PhaseHandle | None = None) -> 
         subprocess.run(cmd_json, cwd=out_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if phase:
             phase.set(60, "Zeek (JSON) completed, collecting logs…")
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        log_runtime_error(f"Zeek JSON failed: {e.stderr}")
         if phase:
             phase.set(20, "Retrying Zeek with ASCII logs…")
-        subprocess.run(cmd_ascii, cwd=out_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if phase:
-            phase.set(60, "Zeek (ASCII) completed, collecting logs…")
+        try:
+            subprocess.run(
+                cmd_ascii, cwd=out_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+            if phase:
+                phase.set(60, "Zeek (ASCII) completed, collecting logs…")
+        except subprocess.CalledProcessError as e2:
+            log_runtime_error(f"Zeek ASCII failed: {e2.stderr}")
+            raise e2
 
     logs = {}
     for name in ("conn.log", "dns.log", "http.log", "ssl.log"):

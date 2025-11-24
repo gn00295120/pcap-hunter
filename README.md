@@ -43,7 +43,13 @@ By combining industry-standard network analysis tools (**Zeek**, **Tshark**) wit
 - **Artifact Hashing**: Automatically calculates SHA256 hashes of extracted files for reputation checking.
 - **Safe Storage**: Carved files are stored locally in a quarantined directory for manual analysis.
 
-### 6. 🌐 OSINT Enrichment
+### 6. 🌍 Interactive World Map & Dashboard
+- **Global Visibility**: Visualizes traffic sources and destinations on a large, interactive world map.
+- **Traffic Volume**: Line thickness varies based on connection volume, highlighting major data flows.
+- **Cross-Filtering**: Click on any location or connection to instantly filter the Protocol Distribution and Flow Timeline charts.
+- **Reset Capability**: Includes a "Clear Selection" button to easily reset the dashboard view.
+
+### 7. 🌐 OSINT Enrichment
 Integrates with leading threat intelligence providers to validate indicators of compromise (IOCs):
 - **VirusTotal**: File hash and IP/Domain reputation.
 - **AbuseIPDB**: Crowdsourced IP abuse reports.

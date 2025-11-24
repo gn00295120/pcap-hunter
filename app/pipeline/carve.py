@@ -3,7 +3,19 @@ def carve_http_payloads(pcap_path: str, out_dir: str, phase=None) -> list[dict]:
     import pathlib
     import subprocess
 
+    from app.utils.common import find_bin
+    from app.utils.logger import log_runtime_error
+
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+
+    tshark_bin = find_bin("tshark", cfg_key="cfg_tshark_bin")
+    if not tshark_bin:
+        msg = "Tshark binary not found for carving."
+        log_runtime_error(msg)
+        if phase:
+            phase.done("Tshark missing.")
+        return [{"_error": msg}]
+
     if phase and phase.should_skip():
         phase.done("HTTP carving skipped.")
         return []
@@ -11,7 +23,7 @@ def carve_http_payloads(pcap_path: str, out_dir: str, phase=None) -> list[dict]:
     if phase:
         phase.set(5, "Running tshark…")
     cmd = [
-        "tshark",
+        tshark_bin,
         "-r",
         pcap_path,
         "-Y",

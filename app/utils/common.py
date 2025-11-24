@@ -9,6 +9,19 @@ def sha256_bytes(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
+def filter_flows_by_ips(flows: list[dict], selected_ips: set[str]) -> list[dict]:
+    """
+    Return a list of flows where src or dst is in selected_ips.
+    If selected_ips is empty, return all flows.
+    """
+    if not selected_ips:
+        return flows
+    return [
+        f for f in flows
+        if f.get("src") in selected_ips or f.get("dst") in selected_ips
+    ]
+
+
 def uniq_sorted(seq):
     if seq is None:
         return []
@@ -74,7 +87,9 @@ def find_bin(name: str, env_key: str = "", cfg_key: str = "") -> str | None:
         f"/opt/zeek/bin/{name}",
         f"/usr/local/zeek/bin/{name}",
         f"/opt/homebrew/bin/{name}",
+        f"/opt/local/bin/{name}",
         f"/usr/local/bin/{name}",
+        f"/usr/bin/{name}",
     ]
     for p in common_paths:
         if Path(p).exists():

@@ -11,7 +11,7 @@ def plot_world_map(ip_data: List[Dict[str, Any]], flows: List[Dict[str, Any]] = 
     """
     Plots a world map with markers for IP locations and connectivity lines.
     ip_data: list of dicts with keys: ip, country, city, lat, lon
-    flows: list of dicts with keys: src, dst (optional, for drawing lines)
+    flows: list of dicts with keys: src, dst, count (optional, for drawing lines)
     """
     if not ip_data:
         return go.Figure()
@@ -21,16 +21,23 @@ def plot_world_map(ip_data: List[Dict[str, Any]], flows: List[Dict[str, Any]] = 
         df["count"] = 1
 
     # Aggregate by location to size markers
-    df_agg = df.groupby(["lat", "lon", "city", "country"]).size().reset_index(name="count")
+    # We also want to keep a list of IPs for each location to help with filtering
+    df_agg = (
+        df.groupby(["lat", "lon", "city", "country"])
+        .agg({"count": "sum", "ip": lambda x: list(x)})
+        .reset_index()
+    )
 
     fig = go.Figure()
 
     # 1. Markers
+    # Add customdata as the list of IPs for that location, so we can filter on click
     fig.add_trace(
         go.Scattergeo(
             lat=df_agg["lat"],
             lon=df_agg["lon"],
             text=df_agg["city"] + ", " + df_agg["country"] + " (" + df_agg["count"].astype(str) + ")",
+            customdata=df_agg["ip"],  # Pass list of IPs for this location
             marker=dict(
                 size=df_agg["count"] * 5,
                 sizemode="area",
@@ -48,34 +55,54 @@ def plot_world_map(ip_data: List[Dict[str, Any]], flows: List[Dict[str, Any]] = 
         # Create a lookup for lat/lon by IP
         loc_map = {d["ip"]: (d["lat"], d["lon"]) for d in ip_data}
 
-        # Limit lines to avoid clutter (e.g., top 100 unique connections)
-        unique_conns = set()
+        # Aggregate flows between src-dst pairs
+        conn_counts = {}
         for f in flows:
             src, dst = f.get("src"), f.get("dst")
+            count = f.get("count", 1)
             if src in loc_map and dst in loc_map and src != dst:
                 # Sort to treat A->B same as B->A for visualization
                 pair = tuple(sorted((src, dst)))
-                unique_conns.add(pair)
+                conn_counts[pair] = conn_counts.get(pair, 0) + count
 
-        # Draw lines
-        lats, lons = [], []
-        for src, dst in list(unique_conns)[:100]:
-            slat, slon = loc_map[src]
-            dlat, dlon = loc_map[dst]
-            lats.extend([slat, dlat, None])
-            lons.extend([slon, dlon, None])
+        # Normalize counts to 3 bins for line thickness: Low (1px), Medium (3px), High (5px)
+        if conn_counts:
+            max_count = max(conn_counts.values())
 
-        if lats:
-            fig.add_trace(
-                go.Scattergeo(
-                    lat=lats,
-                    lon=lons,
-                    mode="lines",
-                    line=dict(width=1, color="rgba(255, 100, 100, 0.5)"),
-                    name="Connectivity",
-                    hoverinfo="skip",
-                )
-            )
+            # Helper to generate lines for a specific width
+            def get_lines_for_width(width_threshold_min, width_threshold_max, line_width, color):
+                lats, lons = [], []
+                for (src, dst), count in conn_counts.items():
+                    # Simple binning logic
+                    if width_threshold_min <= count <= width_threshold_max:
+                        slat, slon = loc_map[src]
+                        dlat, dlon = loc_map[dst]
+                        lats.extend([slat, dlat, None])
+                        lons.extend([slon, dlon, None])
+
+                if lats:
+                    fig.add_trace(
+                        go.Scattergeo(
+                            lat=lats,
+                            lon=lons,
+                            mode="lines",
+                            line=dict(width=line_width, color=color),
+                            name=f"Traffic ({line_width}px)",
+                            hoverinfo="skip",
+                        )
+                    )
+
+            # Binning:
+            # Low: 0 - 33% of max
+            # Med: 33% - 66% of max
+            # High: > 66% of max
+            # Ensure at least 1
+            t1 = max_count * 0.33
+            t2 = max_count * 0.66
+
+            get_lines_for_width(0, t1, 1, "rgba(255, 100, 100, 0.4)")
+            get_lines_for_width(t1 + 0.001, t2, 3, "rgba(255, 100, 100, 0.6)")
+            get_lines_for_width(t2 + 0.001, float("inf"), 5, "rgba(255, 50, 50, 0.8)")
 
     fig.update_geos(
         showcountries=True,
@@ -92,11 +119,12 @@ def plot_world_map(ip_data: List[Dict[str, Any]], flows: List[Dict[str, Any]] = 
         title="Global Traffic Origins & Connectivity",
         template="plotly_dark",
         margin={"r": 0, "t": 30, "l": 0, "b": 0},
-        height=400,  # Fixed height
+        height=600,  # Increased height for prominence
         geo=dict(
-            projection_scale=1.1,  # Slight zoom to fill width
+            projection_scale=1.1,
             center=dict(lat=20, lon=0),
         ),
+        legend=dict(orientation="h", yanchor="bottom", y=0, xanchor="right", x=1)
     )
     return fig
 

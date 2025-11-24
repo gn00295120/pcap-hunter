@@ -30,7 +30,7 @@ All notable changes to this project will be documented in this file.
 - **Crash on Map Reset**: Fixed `StreamlitValueAssignmentNotAllowedError` by using a dynamic widget key for the map, ensuring clean resets.
 - **Binary Detection**: Resolved issues where `tshark` and `zeek` were not found even when installed.
 
-### [0.2.0] - 2025-11-24
+### [0.1.0-alpha] - 2025-11-24
 ### Added
 - **WHOIS Lookup**:
     - Interactive WHOIS modal for IPs and Domains in the OSINT tab.

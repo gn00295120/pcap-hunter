@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 
 from app.utils.common import find_bin
+from app.utils.logger import log_runtime_error
 
 
 def count_packets_fast(pcap_path: str) -> int | None:
@@ -21,8 +22,10 @@ def count_packets_fast(pcap_path: str) -> int | None:
             val = proc.stdout.strip()
             if val.isdigit():
                 return int(val)
-        except Exception:
-            pass
+        except subprocess.CalledProcessError as e:
+            log_runtime_error(f"Capinfos failed: {e.stderr}")
+        except Exception as e:
+            log_runtime_error(f"Unexpected error during capinfos count: {e}")
 
     # Fallback to tshark
     tshark = find_bin("tshark", cfg_key="cfg_tshark_bin")
@@ -38,7 +41,9 @@ def count_packets_fast(pcap_path: str) -> int | None:
                 check=True,
             )
             return len(proc.stdout.splitlines())
-        except Exception:
-            pass
+        except subprocess.CalledProcessError as e:
+            log_runtime_error(f"Tshark count failed: {e.stderr}")
+        except Exception as e:
+            log_runtime_error(f"Unexpected error during tshark count: {e}")
 
     return None

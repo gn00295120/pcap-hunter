@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from typing import Any, Dict, Tuple
 
+from app import config as C
 from app.pipeline.state import PhaseHandle
 from app.utils.common import find_bin, uniq_sorted
 from app.utils.logger import log_runtime_error
@@ -15,6 +17,18 @@ def parse_pcap_pyshark(
     total_packets: int | None,
     progress_every: int = 2000,
 ) -> Dict[str, Any]:
+    # Input validation
+    if not os.path.exists(pcap_path):
+        log_runtime_error(f"PCAP file not found: {pcap_path}")
+        return {
+            "flows": [],
+            "artifacts": {"ips": set(), "domains": set(), "urls": set(), "hashes": set(), "ja3": set()},
+        }
+
+    if limit_packets is not None and not isinstance(limit_packets, int):
+        log_runtime_error(f"Invalid limit_packets value: {limit_packets}")
+        limit_packets = None
+
     tshark_path = find_bin("tshark", cfg_key="cfg_tshark_bin")
     if not tshark_path:
         log_runtime_error("Tshark binary not found. Analysis may fail.")
@@ -23,17 +37,7 @@ def parse_pcap_pyshark(
             "artifacts": {"ips": set(), "domains": set(), "urls": set(), "hashes": set(), "ja3": set()},
         }
 
-    # Fields to extract
-    # 1: frame.time_epoch
-    # 2: ip.src
-    # 3: ip.dst
-    # 4: ipv6.src
-    # 5: ipv6.dst
-    # 6: tcp.srcport
-    # 7: tcp.dstport
-    # 8: udp.srcport
-    # 9: udp.dstport
-    # 10: frame.protocols
+    # Fields to extract (from config)
     cmd = [
         tshark_path,
         "-r",
@@ -42,27 +46,9 @@ def parse_pcap_pyshark(
         "fields",
         "-E",
         "separator=\t",
-        "-e",
-        "frame.time_epoch",
-        "-e",
-        "ip.src",
-        "-e",
-        "ip.dst",
-        "-e",
-        "ipv6.src",
-        "-e",
-        "ipv6.dst",
-        "-e",
-        "tcp.srcport",
-        "-e",
-        "tcp.dstport",
-        "-e",
-        "udp.srcport",
-        "-e",
-        "udp.dstport",
-        "-e",
-        "frame.protocols",
     ]
+    for field in C.TSHARK_FIELDS:
+        cmd.extend(["-e", field])
 
     out = {"flows": [], "artifacts": {"ips": set(), "domains": set(), "urls": set(), "hashes": set(), "ja3": set()}}
     flow_index: Dict[Tuple[str, str, str, str, str], int] = {}
@@ -70,15 +56,14 @@ def parse_pcap_pyshark(
 
     try:
         # Use Popen to stream output line by line
-        with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1) as proc:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        try:
             for line in proc.stdout:
                 if phase and phase.should_skip():
-                    proc.terminate()
                     break
 
                 n += 1
                 if limit_packets and n > limit_packets:
-                    proc.terminate()
                     break
 
                 if phase and (n % progress_every == 0):
@@ -89,7 +74,7 @@ def parse_pcap_pyshark(
                         phase.set(0, f"Parsing {n:,} packets…")
 
                 parts = line.strip().split("\t")
-                if len(parts) < 10:
+                if len(parts) < len(C.TSHARK_FIELDS):
                     continue
 
                 # Unpack fields (tshark returns empty string for missing fields)
@@ -167,6 +152,14 @@ def parse_pcap_pyshark(
                      stderr = proc.stderr.read()
                      if stderr:
                          log_runtime_error(f"Tshark failed: {stderr}")
+
+        finally:
+            if proc:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
 
     except Exception as e:
         log_runtime_error(f"Tshark parsing loop failed: {e}")

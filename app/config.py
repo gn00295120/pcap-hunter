@@ -27,3 +27,17 @@ PRECNT_DEFAULT = True
 
 # OSINT Top-N default (0 = all public IPs)
 OSINT_TOP_IPS_DEFAULT = 50
+
+# TShark fields to extract
+TSHARK_FIELDS = [
+    "frame.time_epoch",
+    "ip.src",
+    "ip.dst",
+    "ipv6.src",
+    "ipv6.dst",
+    "tcp.srcport",
+    "tcp.dstport",
+    "udp.srcport",
+    "udp.dstport",
+    "frame.protocols",
+]

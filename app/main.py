@@ -407,14 +407,62 @@ with tab_dashboard:
     st.markdown("### Dashboard")
 
     feats = st.session_state.get("features") or {}
-    flows = feats.get("flows") or []
+    all_flows = feats.get("flows") or []
+
+    # Initialize filter state
+    if "filter_ips" not in st.session_state:
+        st.session_state["filter_ips"] = set()
+    if "filter_protos" not in st.session_state:
+        st.session_state["filter_protos"] = set()
+    if "filter_time" not in st.session_state:
+        st.session_state["filter_time"] = None  # (start, end)
+
+    # Apply Filters
+    from app.utils.common import filter_flows_by_ips, filter_flows_by_protocol, filter_flows_by_time
+
+    filtered_flows = all_flows
+
+    # 1. IP Filter
+    if st.session_state["filter_ips"]:
+        filtered_flows = filter_flows_by_ips(filtered_flows, st.session_state["filter_ips"])
+
+    # 2. Protocol Filter
+    if st.session_state["filter_protos"]:
+        filtered_flows = filter_flows_by_protocol(filtered_flows, st.session_state["filter_protos"])
+
+    # 3. Time Filter
+    if st.session_state["filter_time"]:
+        start_t, end_t = st.session_state["filter_time"]
+        filtered_flows = filter_flows_by_time(filtered_flows, start_t, end_t)
+
+    # Display active filters
+    active_filters = []
+    if st.session_state["filter_ips"]:
+        active_filters.append(f"{len(st.session_state['filter_ips'])} IPs")
+    if st.session_state["filter_protos"]:
+        active_filters.append(f"Protocols: {', '.join(st.session_state['filter_protos'])}")
+    if st.session_state["filter_time"]:
+        active_filters.append("Time Range")
+
+    if active_filters:
+        st.caption(
+            f"Active Filters: {' + '.join(active_filters)} | Showing {len(filtered_flows)} of {len(all_flows)} flows"
+        )
+        if st.button("Clear All Filters", type="primary"):
+            st.session_state["filter_ips"] = set()
+            st.session_state["filter_protos"] = set()
+            st.session_state["filter_time"] = None
+            st.session_state["map_reset_counter"] += 1
+            st.rerun()
+    else:
+        st.caption(f"Showing all {len(all_flows)} flows")
 
     # 1. World Map
     ip_locs = []
-    if flows:
-        # Collect all public IPs
+    if filtered_flows:
+        # Collect all public IPs from FILTERED flows
         ips = set()
-        for f in flows:
+        for f in filtered_flows:
             if f.get("src") and is_public_ipv4(f["src"]):
                 ips.add(f["src"])
             if f.get("dst") and is_public_ipv4(f["dst"]):
@@ -426,41 +474,30 @@ with tab_dashboard:
             if loc:
                 ip_locs.append(loc)
 
-    selected_ips = set()
     if ip_locs:
         # Render map with selection enabled
         map_event = st.plotly_chart(
-            plot_world_map(ip_locs, flows=flows),
+            plot_world_map(ip_locs, flows=filtered_flows),
             width="stretch",
             on_select="rerun",
             selection_mode=["points", "box", "lasso"],
             key=f"map_select_{st.session_state.get('map_reset_counter', 0)}",
         )
 
-        # Handle selection
+        # Handle Map Selection
         if map_event and "selection" in map_event:
             points = map_event["selection"].get("points", [])
+            new_ips = set()
             for p in points:
-                # customdata contains the list of IPs for that location
                 if "customdata" in p:
-                    selected_ips.update(p["customdata"])
+                    # customdata is a list of IPs for that location
+                    new_ips.update(p["customdata"])
+
+            if new_ips:
+                st.session_state["filter_ips"] = new_ips
+                st.rerun()
     else:
         st.info("No public IP locations found for map.")
-
-    # Filter flows based on selection
-    from app.utils.common import filter_flows_by_ips
-
-    filtered_flows = filter_flows_by_ips(flows, selected_ips)
-
-    if selected_ips:
-        st.caption(f"Filtered: {len(filtered_flows)} flows involving {len(selected_ips)} selected IPs.")
-        st.button(
-            "Clear Selection",
-            type="primary",
-            on_click=lambda: st.session_state.update(
-                {"map_reset_counter": st.session_state.get("map_reset_counter", 0) + 1}
-            ),
-        )
 
     col1, col2 = st.columns(2)
 
@@ -472,14 +509,75 @@ with tab_dashboard:
             proto_counts[p] = proto_counts.get(p, 0) + 1
 
         if proto_counts:
-            st.plotly_chart(plot_protocol_distribution(proto_counts), width="stretch")
+            pie_event = st.plotly_chart(
+                plot_protocol_distribution(proto_counts),
+                width="stretch",
+                on_select="rerun",
+                selection_mode="points",
+                key="pie_select"
+            )
+
+            # Handle Pie Selection
+            if pie_event and "selection" in pie_event:
+                points = pie_event["selection"].get("points", [])
+                if points:
+                    # Point index usually corresponds to the label order
+                    # But safer to try to get label if available, or infer from index
+                    # Plotly pie selection often gives pointNumber.
+                    # We constructed the chart with keys() as names.
+                    # Let's get the label from the point info if possible, or use index.
+                    # Streamlit's event point dict usually has 'label' for pie charts?
+                    # Let's check point structure. Usually it has pointIndex.
+                    # We can map pointIndex back to the sorted keys.
+                    # Keys in proto_counts are not ordered? dict is ordered in Py3.7+.
+                    labels = list(proto_counts.keys())
+                    selected_protos = set()
+                    for p in points:
+                        idx = p.get("point_index")
+                        if idx is not None and 0 <= idx < len(labels):
+                            selected_protos.add(labels[idx])
+
+                    if selected_protos:
+                        st.session_state["filter_protos"] = selected_protos
+                        st.rerun()
         else:
             st.info("No protocol data available.")
 
     # 3. Flow Timeline
     with col2:
         if filtered_flows:
-            st.plotly_chart(plot_flow_timeline(filtered_flows), width="stretch")
+            timeline_event = st.plotly_chart(
+                plot_flow_timeline(filtered_flows),
+                width="stretch",
+                on_select="rerun",
+                selection_mode=["box", "lasso"],
+                key="timeline_select"
+            )
+
+            # Handle Timeline Selection
+            if timeline_event and "selection" in timeline_event:
+                points = timeline_event["selection"].get("points", [])
+                if points:
+                    # Calculate time range from selected points
+                    # Each point has x value (time)
+                    # We want the min and max time of the selection
+                    times = [p.get("x") for p in points if p.get("x")]
+                    # Plotly returns strings for dates usually? Or timestamps?
+                    # Pandas datetime objects might be serialized.
+                    # Let's try to parse or use as is if they are comparable.
+                    # If they are strings, we might need to convert.
+                    # But wait, plot_flow_timeline uses datetime objects.
+                    # Streamlit might return them as strings "2023-..."
+                    if times:
+                        try:
+                            # Convert to timestamps
+                            ts_values = [pd.to_datetime(t).timestamp() for t in times]
+                            min_t = min(ts_values)
+                            max_t = max(ts_values)
+                            st.session_state["filter_time"] = (min_t, max_t)
+                            st.rerun()
+                        except Exception:
+                            pass
         else:
             st.info("No flow data available.")
 

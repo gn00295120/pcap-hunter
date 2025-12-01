@@ -46,8 +46,11 @@ By combining industry-standard network analysis tools (**Zeek**, **Tshark**) wit
 ### 6. 🌍 Interactive World Map & Dashboard
 - **Global Visibility**: Visualizes traffic sources and destinations on a large, interactive world map.
 - **Traffic Volume**: Line thickness varies based on connection volume, highlighting major data flows.
-- **Cross-Filtering**: Click on any location or connection to instantly filter the Protocol Distribution and Flow Timeline charts.
-- **Reset Capability**: Includes a "Clear Selection" button to easily reset the dashboard view.
+- **Cross-Filtering**:
+  - **Unified Drill-Down**: Selecting data in any chart (Map, Pie, or Timeline) filters the entire dashboard.
+  - **Protocol Filter**: Click a slice in the Protocol Pie Chart to isolate that protocol.
+  - **Time Filter**: Select a range on the Flow Timeline to focus on a specific time window.
+- **Reset Capability**: Includes a "Clear All Filters" button to easily reset the dashboard view.
 
 ### 7. 🌐 OSINT Enrichment
 Integrates with leading threat intelligence providers to validate indicators of compromise (IOCs):

@@ -42,11 +42,35 @@ def get_whois_info(target: str) -> dict | str:
 def filter_flows_by_ips(flows: list[dict], selected_ips: set[str]) -> list[dict]:
     """
     Return a list of flows where src or dst is in selected_ips.
-    If selected_ips is empty, return all flows.
     """
     if not selected_ips:
         return flows
-    return [f for f in flows if f.get("src") in selected_ips or f.get("dst") in selected_ips]
+    return [
+        f
+        for f in flows
+        if (f.get("src") in selected_ips) or (f.get("dst") in selected_ips)
+    ]
+
+
+def filter_flows_by_protocol(flows: list[dict], protocols: set[str]) -> list[dict]:
+    if not protocols:
+        return flows
+    return [f for f in flows if f.get("proto") in protocols]
+
+
+def filter_flows_by_time(flows: list[dict], start_ts: float, end_ts: float) -> list[dict]:
+    if start_ts is None or end_ts is None:
+        return flows
+    res = []
+    for f in flows:
+        times = f.get("pkt_times")
+        if not times:
+            continue
+        # Filter by start time matching the scatter plot x-axis
+        t = min(times)
+        if start_ts <= t <= end_ts:
+            res.append(f)
+    return res
 
 
 def uniq_sorted(seq):

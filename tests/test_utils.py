@@ -80,3 +80,62 @@ def test_get_whois_info():
         info = get_whois_info("example.com")
         assert isinstance(info, str)
         assert "WHOIS lookup failed" in info
+
+
+def test_filter_flows_by_protocol():
+    from app.utils.common import filter_flows_by_protocol
+
+    flows = [
+        {"proto": "HTTP", "count": 10},
+        {"proto": "DNS", "count": 5},
+        {"proto": "HTTP", "count": 2},
+        {"proto": "SSH", "count": 1},
+    ]
+
+    # Test empty selection (return all)
+    assert len(filter_flows_by_protocol(flows, set())) == 4
+
+    # Test selection
+    filtered = filter_flows_by_protocol(flows, {"HTTP"})
+    assert len(filtered) == 2
+    assert all(f["proto"] == "HTTP" for f in filtered)
+
+    # Test multiple
+    filtered = filter_flows_by_protocol(flows, {"HTTP", "SSH"})
+    assert len(filtered) == 3
+
+    # Test no match
+    assert len(filter_flows_by_protocol(flows, {"FTP"})) == 0
+
+
+def test_filter_flows_by_time():
+    from app.utils.common import filter_flows_by_time
+
+    flows = [
+        {"pkt_times": [100, 105], "id": 1},
+        {"pkt_times": [200, 210], "id": 2},
+        {"pkt_times": [300, 305], "id": 3},
+        {"pkt_times": [], "id": 4},  # No times
+    ]
+
+    # Test range covering all
+    filtered = filter_flows_by_time(flows, 0, 400)
+    assert len(filtered) == 3  # id 4 excluded
+
+    # Test range covering some
+    filtered = filter_flows_by_time(flows, 150, 250)
+    assert len(filtered) == 1
+    assert filtered[0]["id"] == 2
+
+    # Test exact match start
+    filtered = filter_flows_by_time(flows, 100, 100)
+    assert len(filtered) == 1
+    assert filtered[0]["id"] == 1
+
+    # Test no match
+    filtered = filter_flows_by_time(flows, 500, 600)
+    assert len(filtered) == 0
+
+    # Test None inputs
+    assert len(filter_flows_by_time(flows, None, None)) == 4
+

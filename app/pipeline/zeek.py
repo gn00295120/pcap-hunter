@@ -98,20 +98,20 @@ def merge_zeek_dns(zeek_tables: dict, features: dict) -> dict:
     """Merge DNS queries from Zeek logs into features artifacts."""
     if not isinstance(features, dict):
         features = {"artifacts": {"domains": []}}
-    
+
     if "dns.log" in zeek_tables:
         df_dns = zeek_tables["dns.log"]
         if not df_dns.empty and "query" in df_dns.columns:
             queries = df_dns["query"].dropna().unique().tolist()
-            
+
             # Ensure artifacts structure exists
             if "artifacts" not in features:
                 features["artifacts"] = {}
             if "domains" not in features["artifacts"]:
                 features["artifacts"]["domains"] = []
-            
+
             from app.utils.common import uniq_sorted
             current = features["artifacts"]["domains"]
             features["artifacts"]["domains"] = uniq_sorted(current + queries)
-            
+
     return features

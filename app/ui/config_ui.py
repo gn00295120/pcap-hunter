@@ -3,30 +3,90 @@ import os
 import streamlit as st
 
 from app import config as C
+from app.utils.config_manager import get_config_manager
+
+# Keys to persist (mapping session_state key -> config file key)
+PERSIST_KEYS = {
+    "cfg_lm_base_url": "cfg_llm_endpoint",
+    "cfg_lm_api_key": "cfg_openai_key",
+    "cfg_lm_model": "cfg_llm_model",
+    "cfg_otx": "cfg_otx_key",
+    "cfg_vt": "cfg_vt_key",
+    "cfg_abuseipdb": "cfg_abuseipdb_key",
+    "cfg_greynoise": "cfg_greynoise_key",
+    "cfg_shodan": "cfg_shodan_key",
+    "cfg_limit_packets": "cfg_pyshark_limit",
+    "cfg_osint_top_ips": "cfg_osint_top_ips",
+    "cfg_zeek_bin": "cfg_zeek_bin",
+    "cfg_tshark_bin": "cfg_tshark_bin",
+}
 
 
 def init_config_defaults():
-    _ss_default("cfg_lm_base_url", os.getenv("LMSTUDIO_BASE_URL", C.LM_BASE_URL))
-    _ss_default("cfg_lm_api_key", os.getenv("LMSTUDIO_API_KEY", C.LM_API_KEY))
-    _ss_default("cfg_lm_model", os.getenv("LMSTUDIO_MODEL", C.LM_MODEL))
+    """Initialize config defaults, loading from persistent storage first."""
+    # Try to load saved config
+    cm = get_config_manager()
+    saved_config = cm.load()
 
-    _ss_default("cfg_otx", os.getenv("OTX_KEY", C.OTX_KEY))
-    _ss_default("cfg_vt", os.getenv("VT_KEY", C.VT_KEY))
-    _ss_default("cfg_abuseipdb", os.getenv("ABUSEIPDB_KEY", C.ABUSEIPDB_KEY))
-    _ss_default("cfg_greynoise", os.getenv("GREYNOISE_KEY", C.GREYNOISE_KEY))
-    _ss_default("cfg_shodan", os.getenv("SHODAN_KEY", C.SHODAN_KEY))
+    # LLM settings (check saved config first, then env, then defaults)
+    _ss_default("cfg_lm_base_url", saved_config.get("cfg_llm_endpoint") or os.getenv("LMSTUDIO_BASE_URL", C.LM_BASE_URL))
+    _ss_default("cfg_lm_api_key", saved_config.get("cfg_openai_key") or os.getenv("LMSTUDIO_API_KEY", C.LM_API_KEY))
+    _ss_default("cfg_lm_model", saved_config.get("cfg_llm_model") or os.getenv("LMSTUDIO_MODEL", C.LM_MODEL))
 
-    _ss_default("cfg_limit_packets", C.DEFAULT_PYSHARK_LIMIT)
+    # OSINT keys
+    _ss_default("cfg_otx", saved_config.get("cfg_otx_key") or os.getenv("OTX_KEY", C.OTX_KEY))
+    _ss_default("cfg_vt", saved_config.get("cfg_vt_key") or os.getenv("VT_KEY", C.VT_KEY))
+    _ss_default("cfg_abuseipdb", saved_config.get("cfg_abuseipdb_key") or os.getenv("ABUSEIPDB_KEY", C.ABUSEIPDB_KEY))
+    _ss_default("cfg_greynoise", saved_config.get("cfg_greynoise_key") or os.getenv("GREYNOISE_KEY", C.GREYNOISE_KEY))
+    _ss_default("cfg_shodan", saved_config.get("cfg_shodan_key") or os.getenv("SHODAN_KEY", C.SHODAN_KEY))
+
+    # Analysis settings
+    _ss_default("cfg_limit_packets", saved_config.get("cfg_pyshark_limit") or C.DEFAULT_PYSHARK_LIMIT)
     _ss_default("cfg_do_pyshark", True)
     _ss_default("cfg_do_zeek", True)
     _ss_default("cfg_do_carve", True)
     _ss_default("cfg_pre_count", C.PRECNT_DEFAULT)
-    _ss_default("cfg_osint_top_ips", C.OSINT_TOP_IPS_DEFAULT)
+    _ss_default("cfg_osint_top_ips", saved_config.get("cfg_osint_top_ips") or C.OSINT_TOP_IPS_DEFAULT)
+
+    # Binary paths
+    _ss_default("cfg_zeek_bin", saved_config.get("cfg_zeek_bin") or "")
+    _ss_default("cfg_tshark_bin", saved_config.get("cfg_tshark_bin") or "")
 
 
 def _ss_default(key: str, value):
     if key not in st.session_state:
         st.session_state[key] = value
+
+
+def save_config() -> bool:
+    """Save current session config to persistent storage."""
+    cm = get_config_manager()
+    config_to_save = {}
+
+    for ss_key, cfg_key in PERSIST_KEYS.items():
+        value = st.session_state.get(ss_key)
+        if value is not None:
+            config_to_save[cfg_key] = value
+
+    try:
+        cm.save(config_to_save)
+        return True
+    except Exception:
+        return False
+
+
+def load_config() -> bool:
+    """Load config from persistent storage into session state."""
+    cm = get_config_manager()
+    try:
+        saved_config = cm.load()
+
+        for ss_key, cfg_key in PERSIST_KEYS.items():
+            if cfg_key in saved_config and saved_config[cfg_key]:
+                st.session_state[ss_key] = saved_config[cfg_key]
+        return True
+    except Exception:
+        return False
 
 
 def render_config_tab():
@@ -121,16 +181,34 @@ def render_config_tab():
         step=5,
     )
 
-    st.caption("Changes are saved immediately in Session State.")
-    col_buttons = st.columns([1, 1, 6])
+    st.markdown("---")
+    st.markdown("#### Save / Load Configuration")
+    st.caption("Save your settings to persist across sessions. API keys are encrypted.")
+
+    col_buttons = st.columns([1, 1, 1, 1, 4])
     with col_buttons[0]:
+        if st.button("Save Config", type="primary"):
+            if save_config():
+                st.success("Config saved!")
+            else:
+                st.error("Failed to save config.")
+    with col_buttons[1]:
+        if st.button("Load Config"):
+            if load_config():
+                st.success("Config loaded!")
+                st.rerun()
+            else:
+                st.error("Failed to load config.")
+    with col_buttons[2]:
         if st.button("Apply & Rerun"):
             st.rerun()
-    with col_buttons[1]:
-        if st.button("Reset to Defaults"):
+    with col_buttons[3]:
+        if st.button("Reset Defaults"):
             for k in list(st.session_state.keys()):
                 if k.startswith("cfg_"):
                     del st.session_state[k]
+            # Clear saved config
+            get_config_manager().clear()
             init_config_defaults()
             st.success("Config reset to defaults.")
             st.rerun()

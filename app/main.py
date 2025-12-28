@@ -30,6 +30,8 @@ from app.ui.layout import (
     make_results_panel,
     make_tabs,
     render_carved,
+    render_flows,
+    render_ja3,
     render_osint,
     render_overview,
     render_report,
@@ -281,6 +283,13 @@ with tab_progress:
             from app.pipeline.zeek import merge_zeek_dns
             features = merge_zeek_dns(zeek_tables, features)
             st.session_state["features"] = features
+
+            # Extract JA3 fingerprints from ssl.log
+            from app.pipeline.zeek import extract_ja3_from_zeek_tables
+            zeek_log_paths = {name: str(C.ZEEK_DIR / name) for name in zeek_tables.keys()}
+            ja3_df, ja3_analysis = extract_ja3_from_zeek_tables(zeek_log_paths)
+            st.session_state["ja3_df"] = ja3_df
+            st.session_state["ja3_analysis"] = ja3_analysis
 
         # Beaconing
         p = tracker.next_phase("Beaconing ranking")
@@ -594,6 +603,13 @@ with tab_results:
     results_panel = make_results_panel(st.container())
     with results_panel:
         render_overview(results_panel, st.session_state.get("features"))
+        feats = st.session_state.get("features") or {}
+        render_flows(results_panel, feats.get("flows"))
+        render_ja3(
+            results_panel,
+            st.session_state.get("ja3_df"),
+            st.session_state.get("ja3_analysis"),
+        )
         render_zeek(results_panel, st.session_state.get("zeek_tables") or {})
         render_carved(results_panel, st.session_state.get("carved") or [])
 

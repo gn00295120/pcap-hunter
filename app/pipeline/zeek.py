@@ -111,7 +111,30 @@ def merge_zeek_dns(zeek_tables: dict, features: dict) -> dict:
                 features["artifacts"]["domains"] = []
 
             from app.utils.common import uniq_sorted
-            current = features["artifacts"]["domains"]
-            features["artifacts"]["domains"] = uniq_sorted(current + queries)
+            current = list(features["artifacts"]["domains"])
+            features["artifacts"]["domains"] = uniq_sorted(current + list(queries))
 
     return features
+
+
+def extract_ja3_from_zeek_tables(zeek_logs: dict[str, str]) -> tuple:
+    """
+    Extract JA3 data from Zeek ssl.log.
+
+    Args:
+        zeek_logs: Dict mapping log name to file path
+
+    Returns:
+        Tuple of (DataFrame with JA3 data, analysis summary dict)
+    """
+    import pandas as pd
+    from app.pipeline.ja3 import extract_ja3_from_zeek, analyze_ja3_results
+
+    if "ssl.log" not in zeek_logs:
+        return pd.DataFrame(), {}
+
+    ssl_log_path = zeek_logs["ssl.log"]
+    df = extract_ja3_from_zeek(ssl_log_path)
+    analysis = analyze_ja3_results(df)
+
+    return df, analysis

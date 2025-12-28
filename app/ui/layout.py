@@ -4,6 +4,13 @@ import pandas as pd
 import streamlit as st
 
 from app.utils.common import is_public_ipv4
+from app.utils.export import (
+    export_dataframe_to_csv,
+    export_dataframe_to_json,
+    export_to_csv,
+    export_to_json,
+    generate_export_filename,
+)
 
 
 def inject_css():
@@ -21,6 +28,50 @@ def inject_css():
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_export_buttons(data, prefix: str, key_suffix: str = "", is_dataframe: bool = False):
+    """
+    Render CSV and JSON export buttons for data.
+
+    Args:
+        data: Data to export (list of dicts or DataFrame)
+        prefix: Filename prefix (e.g., "flows", "osint")
+        key_suffix: Optional suffix for unique button keys
+        is_dataframe: Whether data is a pandas DataFrame
+    """
+    if data is None or (is_dataframe and data.empty) or (not is_dataframe and not data):
+        return
+
+    col1, col2, _ = st.columns([1, 1, 4])
+
+    with col1:
+        if is_dataframe:
+            csv_data = export_dataframe_to_csv(data)
+        else:
+            csv_data = export_to_csv(data)
+
+        st.download_button(
+            label="CSV",
+            data=csv_data,
+            file_name=generate_export_filename(prefix, "csv"),
+            mime="text/csv",
+            key=f"export_csv_{prefix}_{key_suffix}",
+        )
+
+    with col2:
+        if is_dataframe:
+            json_data = export_dataframe_to_json(data)
+        else:
+            json_data = export_to_json(data)
+
+        st.download_button(
+            label="JSON",
+            data=json_data,
+            file_name=generate_export_filename(prefix, "json"),
+            mime="application/json",
+            key=f"export_json_{prefix}_{key_suffix}",
+        )
 
 
 def make_tabs():
@@ -70,6 +121,7 @@ def render_zeek(result_col, zeek_tables):
                 with tabs[i]:
                     df = zeek_tables.get(name)
                     if isinstance(df, pd.DataFrame) and not df.empty:
+                        render_export_buttons(df, f"zeek_{name}", key_suffix=name, is_dataframe=True)
                         st.dataframe(df, width="stretch", hide_index=True)
                     else:
                         st.caption("No rows.")
@@ -84,6 +136,7 @@ def render_carved(result_col, carved):
                 df = pd.DataFrame(carved)
                 cols = ["time", "tcp_stream", "content_type", "content_length", "sha256", "path"]
                 cols = [c for c in cols if c in df.columns]
+                render_export_buttons(df[cols], "carved_payloads", key_suffix="carved", is_dataframe=True)
                 st.dataframe(df[cols], width="stretch", hide_index=True)
             else:
                 st.caption("No HTTP payloads carved.")
@@ -174,6 +227,7 @@ def render_osint(result_col, osint_data):
 
             if ip_rows:
                 df_ips = pd.DataFrame(ip_rows)
+                render_export_buttons(df_ips, "osint_ips", key_suffix="ips", is_dataframe=True)
                 event = st.dataframe(
                     df_ips,
                     width="stretch",
@@ -203,6 +257,7 @@ def render_osint(result_col, osint_data):
 
             if dom_rows:
                 df_doms = pd.DataFrame(dom_rows)
+                render_export_buttons(df_doms, "osint_domains", key_suffix="doms", is_dataframe=True)
                 event = st.dataframe(
                     df_doms,
                     width="stretch",
@@ -217,6 +272,71 @@ def render_osint(result_col, osint_data):
                     show_whois_dialog(target_dom)
             else:
                 st.info("No domain findings.")
+
+
+def render_flows(result_col, flows: list[dict] | None):
+    """Render flows table with export buttons."""
+    with result_col:
+        with st.expander("Flow Data", expanded=False):
+            if flows:
+                df = pd.DataFrame(flows)
+                # Select key columns if available
+                display_cols = ["src", "dst", "sport", "dport", "proto", "count"]
+                display_cols = [c for c in display_cols if c in df.columns]
+                if display_cols:
+                    render_export_buttons(df[display_cols], "flows", key_suffix="flows", is_dataframe=True)
+                    st.dataframe(df[display_cols], width="stretch", hide_index=True)
+                else:
+                    render_export_buttons(df, "flows", key_suffix="flows_all", is_dataframe=True)
+                    st.dataframe(df, width="stretch", hide_index=True)
+            else:
+                st.caption("No flow data available.")
+
+
+def render_ja3(result_col, ja3_df, ja3_analysis: dict | None):
+    """Render JA3 fingerprint analysis results."""
+    with result_col:
+        with st.expander("JA3 TLS Fingerprints", expanded=bool(ja3_analysis and ja3_analysis.get("malware_detected"))):
+            if ja3_analysis and ja3_analysis.get("total_tls_sessions", 0) > 0:
+                # Summary metrics
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("TLS Sessions", ja3_analysis.get("total_tls_sessions", 0))
+                with col2:
+                    st.metric("Unique JA3", ja3_analysis.get("unique_ja3", 0))
+                with col3:
+                    unknown = ja3_analysis.get("unknown_ja3", 0)
+                    st.metric("Unknown", unknown)
+                with col4:
+                    if ja3_analysis.get("malware_detected"):
+                        st.metric("Malware Detected", "YES", delta="Alert", delta_color="inverse")
+                    else:
+                        st.metric("Malware Detected", "No")
+
+                # Malware warning
+                if ja3_analysis.get("malware_detected"):
+                    st.error("Malware JA3 fingerprints detected!")
+                    malware_list = ja3_analysis.get("malware_ja3", [])
+                    for m in malware_list:
+                        st.warning(f"**{m.get('ja3_client')}** detected: {m.get('src')} -> {m.get('dst')}")
+
+                # Top clients
+                top_clients = ja3_analysis.get("top_clients", {})
+                if top_clients:
+                    st.markdown("**Top TLS Clients:**")
+                    for client, count in list(top_clients.items())[:5]:
+                        st.text(f"  {client}: {count}")
+
+                # Full table
+                if ja3_df is not None and not ja3_df.empty:
+                    st.markdown("---")
+                    display_cols = ["src", "dst", "server_name", "ja3", "ja3_client", "ja3_malware"]
+                    display_cols = [c for c in display_cols if c in ja3_df.columns]
+                    if display_cols:
+                        render_export_buttons(ja3_df[display_cols], "ja3", key_suffix="ja3", is_dataframe=True)
+                        st.dataframe(ja3_df[display_cols], width="stretch", hide_index=True)
+            else:
+                st.caption("No TLS/JA3 data available. Run analysis with PCAP containing TLS traffic.")
 
 
 def render_report(result_col, report_md):

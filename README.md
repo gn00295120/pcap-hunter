@@ -73,7 +73,7 @@ Integrates with leading threat intelligence providers to validate indicators of 
 ### Quick Start
 1. **Clone the repo**:
    ```bash
-   git clone https://github.com/yourusername/pcap-hunter.git
+   git clone https://github.com/ninedter/pcap-hunter.git
    cd pcap-hunter
    ```
 2. **Install dependencies**:

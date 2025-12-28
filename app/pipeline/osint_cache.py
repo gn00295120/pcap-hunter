@@ -23,18 +23,21 @@ class OSINTCache:
     - Thread-safe with WAL mode and connection pooling
     - Provider-specific caching
     - Automatic corruption recovery
+    - Enable/disable toggle for fresh queries
     """
 
-    def __init__(self, db_path: str | Path, ttl_hours: int = 24):
+    def __init__(self, db_path: str | Path, ttl_hours: int = 24, enabled: bool = True):
         """
         Initialize the OSINT cache.
 
         Args:
             db_path: Path to SQLite database file
             ttl_hours: Time-to-live in hours (default: 24)
+            enabled: Whether caching is enabled (default: True)
         """
         self.db_path = Path(db_path)
         self.ttl_seconds = ttl_hours * 3600
+        self.enabled = enabled
         self._local = threading.local()
         self._lock = threading.Lock()
         self._init_db()
@@ -119,6 +122,11 @@ class OSINTCache:
                 pass
             self._local.conn = None
 
+    def set_enabled(self, enabled: bool) -> None:
+        """Enable or disable caching at runtime."""
+        self.enabled = enabled
+        logger.info(f"OSINT cache {'enabled' if enabled else 'disabled'}")
+
     def get(self, indicator: str, provider: str) -> dict | None:
         """
         Get cached response for an indicator and provider.
@@ -128,8 +136,11 @@ class OSINTCache:
             provider: OSINT provider name (e.g., "greynoise", "vt")
 
         Returns:
-            Cached data dict or None if not found/expired
+            Cached data dict or None if not found/expired/disabled
         """
+        if not self.enabled:
+            return None
+
         cutoff = time.time() - self.ttl_seconds
 
         with self._get_conn() as conn:
@@ -159,6 +170,9 @@ class OSINTCache:
             provider: OSINT provider name
             data: Response data to cache
         """
+        if not self.enabled:
+            return
+
         with self._get_conn() as conn:
             conn.execute(
                 """

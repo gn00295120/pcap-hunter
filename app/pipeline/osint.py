@@ -15,10 +15,19 @@ _cache = None
 
 
 def _get_cache():
-    """Get or create cache instance."""
+    """Get or create cache instance with enabled state from config."""
     global _cache
     if _cache is None:
         _cache = get_osint_cache()
+
+    # Update enabled state from session config
+    try:
+        import streamlit as st
+        enabled = st.session_state.get("cfg_osint_cache_enabled", False)
+        _cache.set_enabled(enabled)
+    except Exception:
+        pass  # Not in Streamlit context
+
     return _cache
 
 

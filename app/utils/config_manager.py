@@ -27,6 +27,7 @@ DEFAULT_CONFIG = {
     "cfg_llm_model": "llama3.1:8b",
     "cfg_pyshark_limit": 200000,
     "cfg_osint_top_ips": 50,
+    "cfg_osint_cache_enabled": False,  # Enable/disable OSINT response caching
     "cfg_vt_key": "",
     "cfg_greynoise_key": "",
     "cfg_shodan_key": "",

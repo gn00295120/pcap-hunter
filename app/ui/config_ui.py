@@ -17,6 +17,7 @@ PERSIST_KEYS = {
     "cfg_shodan": "cfg_shodan_key",
     "cfg_limit_packets": "cfg_pyshark_limit",
     "cfg_osint_top_ips": "cfg_osint_top_ips",
+    "cfg_osint_cache_enabled": "cfg_osint_cache_enabled",
     "cfg_zeek_bin": "cfg_zeek_bin",
     "cfg_tshark_bin": "cfg_tshark_bin",
 }
@@ -47,6 +48,7 @@ def init_config_defaults():
     _ss_default("cfg_do_carve", True)
     _ss_default("cfg_pre_count", C.PRECNT_DEFAULT)
     _ss_default("cfg_osint_top_ips", saved_config.get("cfg_osint_top_ips") or C.OSINT_TOP_IPS_DEFAULT)
+    _ss_default("cfg_osint_cache_enabled", saved_config.get("cfg_osint_cache_enabled", False))
 
     # Binary paths
     _ss_default("cfg_zeek_bin", saved_config.get("cfg_zeek_bin") or "")
@@ -173,13 +175,21 @@ def render_config_tab():
             "Pre-count packets", value=bool(st.session_state.get("cfg_pre_count", C.PRECNT_DEFAULT))
         )
 
-    st.session_state["cfg_osint_top_ips"] = st.number_input(
-        "OSINT: Top N public IPs to enrich (0 = all)",
-        min_value=0,
-        max_value=1000,
-        value=int(st.session_state.get("cfg_osint_top_ips", 50)),
-        step=5,
-    )
+    osint_col1, osint_col2 = st.columns([3, 1])
+    with osint_col1:
+        st.session_state["cfg_osint_top_ips"] = st.number_input(
+            "OSINT: Top N public IPs to enrich (0 = all)",
+            min_value=0,
+            max_value=1000,
+            value=int(st.session_state.get("cfg_osint_top_ips", 50)),
+            step=5,
+        )
+    with osint_col2:
+        st.session_state["cfg_osint_cache_enabled"] = st.checkbox(
+            "Enable OSINT Cache",
+            value=bool(st.session_state.get("cfg_osint_cache_enabled", False)),
+            help="Cache OSINT API responses to speed up repeated analysis. Disable for fresh results.",
+        )
 
     st.markdown("---")
     st.markdown("#### Save / Load Configuration")

@@ -48,6 +48,8 @@ def test_filter_flows_by_ips():
 
 
 def test_resolve_ip():
+    import socket
+
     from app.utils.common import resolve_ip
 
     # Test success
@@ -55,15 +57,19 @@ def test_resolve_ip():
         assert resolve_ip("8.8.8.8") == "google-public-dns-a.google.com"
 
     # Test failure
-    with patch("socket.gethostbyaddr", side_effect=Exception("Host not found")):
+    with patch("socket.gethostbyaddr", side_effect=socket.herror("Host not found")):
         assert resolve_ip("1.2.3.4") is None
 
 
 def test_get_whois_info():
     from app.utils.common import get_whois_info
 
+    # Create a mock whois module
+    mock_whois_module = MagicMock()
+
     # Test success (dict)
-    with patch("whois.whois", return_value={"domain_name": "example.com"}):
+    mock_whois_module.whois.return_value = {"domain_name": "example.com"}
+    with patch.dict("sys.modules", {"whois": mock_whois_module}):
         info = get_whois_info("example.com")
         assert isinstance(info, dict)
         assert info["domain_name"] == "example.com"
@@ -71,12 +77,14 @@ def test_get_whois_info():
     # Test success (object with text)
     mock_w = MagicMock()
     mock_w.text = "Domain Name: EXAMPLE.COM"
-    with patch("whois.whois", return_value=mock_w):
+    mock_whois_module.whois.return_value = mock_w
+    with patch.dict("sys.modules", {"whois": mock_whois_module}):
         info = get_whois_info("example.com")
         assert info == mock_w
 
     # Test failure
-    with patch("whois.whois", side_effect=Exception("Lookup failed")):
+    mock_whois_module.whois.side_effect = Exception("Lookup failed")
+    with patch.dict("sys.modules", {"whois": mock_whois_module}):
         info = get_whois_info("example.com")
         assert isinstance(info, str)
         assert "WHOIS lookup failed" in info

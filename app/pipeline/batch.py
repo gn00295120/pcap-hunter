@@ -315,18 +315,21 @@ def aggregate_dns_analysis(results: list[PCAPResult]) -> dict[str, Any]:
 
         total_records += dns.get("total_records", 0)
 
-        # Aggregate detections
+        # Aggregate detections (copy to avoid mutating input)
         for dga in dns.get("dga_detections", []):
-            dga["_source_file"] = r.filename
-            all_dga.append(dga)
+            dga_copy = dict(dga)
+            dga_copy["_source_file"] = r.filename
+            all_dga.append(dga_copy)
 
         for tunnel in dns.get("tunneling_detections", []):
-            tunnel["_source_file"] = r.filename
-            all_tunneling.append(tunnel)
+            tunnel_copy = dict(tunnel)
+            tunnel_copy["_source_file"] = r.filename
+            all_tunneling.append(tunnel_copy)
 
         for ff in dns.get("fast_flux_detections", []):
-            ff["_source_file"] = r.filename
-            all_fast_flux.append(ff)
+            ff_copy = dict(ff)
+            ff_copy["_source_file"] = r.filename
+            all_fast_flux.append(ff_copy)
 
         # Aggregate query types
         for qtype, count in dns.get("query_types", {}).items():
@@ -382,14 +385,16 @@ def aggregate_tls_analysis(results: list[PCAPResult]) -> dict[str, Any]:
             fp = cert.get("fingerprint_sha256", "")
             if fp and fp not in seen_fingerprints:
                 seen_fingerprints.add(fp)
-                cert["_source_file"] = r.filename
-                all_certs.append(cert)
+                # Copy to avoid mutating input
+                cert_copy = dict(cert)
+                cert_copy["_source_file"] = r.filename
+                all_certs.append(cert_copy)
 
-                if cert.get("is_self_signed"):
+                if cert_copy.get("is_self_signed"):
                     self_signed += 1
-                if cert.get("is_expired"):
+                if cert_copy.get("is_expired"):
                     expired += 1
-                if cert.get("risk_score", 0) >= 0.5:
+                if cert_copy.get("risk_score", 0) >= 0.5:
                     high_risk += 1
 
     # Sort by risk score

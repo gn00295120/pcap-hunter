@@ -3,14 +3,13 @@
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
-import pytest
 
 from app.pipeline.tls_certs import (
     Certificate,
-    parse_datetime,
     _analyze_certificate,
-    extract_from_zeek_ssl,
     analyze_certificates,
+    extract_from_zeek_ssl,
+    parse_datetime,
 )
 
 

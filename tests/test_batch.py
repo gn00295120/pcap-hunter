@@ -1,18 +1,16 @@
 """Tests for batch processing and cross-file correlation."""
 
 import pandas as pd
-import pytest
 
 from app.pipeline.batch import (
-    PCAPResult,
-    CorrelationResult,
     BatchProcessor,
-    correlate_results,
-    merge_zeek_tables,
-    merge_osint,
-    merge_beacon_candidates,
+    PCAPResult,
     aggregate_dns_analysis,
     aggregate_tls_analysis,
+    correlate_results,
+    merge_beacon_candidates,
+    merge_osint,
+    merge_zeek_tables,
 )
 
 
@@ -197,13 +195,27 @@ class TestAggregateDNS:
                 path="/data/1.pcap",
                 filename="1.pcap",
                 features={},
-                dns_analysis={"total_records": 100, "dga_detections": [], "tunneling_detections": [], "fast_flux_detections": [], "query_types": {"A": 50}, "top_queried": []},
+                dns_analysis={
+                    "total_records": 100,
+                    "dga_detections": [],
+                    "tunneling_detections": [],
+                    "fast_flux_detections": [],
+                    "query_types": {"A": 50},
+                    "top_queried": [],
+                },
             ),
             PCAPResult(
                 path="/data/2.pcap",
                 filename="2.pcap",
                 features={},
-                dns_analysis={"total_records": 200, "dga_detections": [], "tunneling_detections": [], "fast_flux_detections": [], "query_types": {"A": 100, "AAAA": 50}, "top_queried": []},
+                dns_analysis={
+                    "total_records": 200,
+                    "dga_detections": [],
+                    "tunneling_detections": [],
+                    "fast_flux_detections": [],
+                    "query_types": {"A": 100, "AAAA": 50},
+                    "top_queried": [],
+                },
             ),
         ]
         aggregated = aggregate_dns_analysis(results)

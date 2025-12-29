@@ -172,6 +172,7 @@ def extract_certificates_tshark(pcap_path: str | Path, phase: PhaseHandle | None
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode != 0:
             logger.warning(f"tshark returned {result.returncode}: {result.stderr}")
+            return []
     except subprocess.TimeoutExpired:
         logger.error("tshark timed out during certificate extraction")
         return []

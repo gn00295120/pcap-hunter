@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **OSINT Dialogs**: Resolved `StreamlitAPIException` when selecting rows in OSINT tables by improving session state tracking for dialogs.
 - **Language Persistence**: Fixed an issue where the selected report language would reset during a re-run by adhering to strict session state binding.
+- **Section Localization**: Localized all report section headers (e.g., "Key Findings") for all supported languages, ensuring the entire report is translated.
 - **Report Truncation**: Increased token limits for "Recommended Actions" and refined prompts to ensure actionable advice is not cut off.
 
 ## [0.2.0-alpha] - 2025-12-01

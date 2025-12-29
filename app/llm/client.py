@@ -91,6 +91,84 @@ def generate_report(
         ("Recommended Actions", "Write the 'Recommended Actions' section. Provide a concise, prioritized list of the top 5-7 concrete steps."),
     ]
 
+    # Translate section titles if not English
+    translations = {
+        "Tradition Chinese (zh-tw)": {
+            "Executive Summary": "執行摘要",
+            "Key Findings": "主要發現",
+            "Indicators & Evidence": "指標與證據",
+            "OSINT Corroboration": "OSINT 偵察驗證",
+            "Potential Beaconing / C2 Rationale": "潛在信標 / C2 原理說明",
+            "Risk Assessment": "風險評估",
+            "Recommended Actions": "建議處置行動",
+        },
+        "Simplified Chinese (zh-cn)": {
+            "Executive Summary": "执行摘要",
+            "Key Findings": "主要发现",
+            "Indicators & Evidence": "指标与证据",
+            "OSINT Corroboration": "OSINT 侦察验证",
+            "Potential Beaconing / C2 Rationale": "潜在信标 / C2 原理说明",
+            "Risk Assessment": "风险评估",
+            "Recommended Actions": "建议处置行动",
+        },
+        "Japanese": {
+            "Executive Summary": "エグゼクティブサマリー",
+            "Key Findings": "主な発見事項",
+            "Indicators & Evidence": "指標と証拠",
+            "OSINT Corroboration": "OSINTによる裏付け",
+            "Potential Beaconing / C2 Rationale": "潜在的なビーコニング / C2の根拠",
+            "Risk Assessment": "リスク評価",
+            "Recommended Actions": "推奨されるアクション",
+        },
+        "Korean": {
+            "Executive Summary": "요약 보고서",
+            "Key Findings": "주요 결과",
+            "Indicators & Evidence": "지표 및 증거",
+            "OSINT Corroboration": "OSINT 교차 검증",
+            "Potential Beaconing / C2 Rationale": "잠재적 비코닝 / C2 근거",
+            "Risk Assessment": "위험 평가",
+            "Recommended Actions": "권장 조치 사항",
+        },
+        "Italian": {
+            "Executive Summary": "Riepilogo Esecutivo",
+            "Key Findings": "Risultati Principali",
+            "Indicators & Evidence": "Indicatori ed Evidenze",
+            "OSINT Corroboration": "Corroborazione OSINT",
+            "Potential Beaconing / C2 Rationale": "Potenziale Beaconing / Analisi C2",
+            "Risk Assessment": "Valutazione del Rischio",
+            "Recommended Actions": "Azioni Raccomandate",
+        },
+        "Spanish": {
+            "Executive Summary": "Resumen Ejecutivo",
+            "Key Findings": "Hallazgos Clave",
+            "Indicators & Evidence": "Indicadores y Evidencias",
+            "OSINT Corroboration": "Corroboración OSINT",
+            "Potential Beaconing / C2 Rationale": "Posible Beaconing / Razón de C2",
+            "Risk Assessment": "Evaluación de Riesgos",
+            "Recommended Actions": "Acciones Recomendadas",
+        },
+        "French": {
+            "Executive Summary": "Résumé Exécutif",
+            "Key Findings": "Principales Constatations",
+            "Indicators & Evidence": "Indicateurs et Preuves",
+            "OSINT Corroboration": "Corroboration OSINT",
+            "Potential Beaconing / C2 Rationale": "Beaconing Potentiel / Analyse C2",
+            "Risk Assessment": "Évaluation des Risques",
+            "Recommended Actions": "Actions Recommandées",
+        },
+        "German": {
+            "Executive Summary": "Zusammenfassung für die Geschäftsführung",
+            "Key Findings": "Wichtigste Erkenntnisse",
+            "Indicators & Evidence": "Indikatoren und Beweise",
+            "OSINT Corroboration": "OSINT-Bestätigung",
+            "Potential Beaconing / C2 Rationale": "Potenzielles Beaconing / C2-Begründung",
+            "Risk Assessment": "Risikobewertung",
+            "Recommended Actions": "Empfohlene Maßnahmen",
+        }
+    }
+
+    t_map = translations.get(language, {})
+
     client = OpenAI(base_url=base_url, api_key=api_key)
     
     # Common system message
@@ -101,15 +179,18 @@ def generate_report(
     full_report_parts = []
     
     for title, instruction in sections:
+        # Translate title and instructions if possible
+        display_title = t_map.get(title, title)
+        
         # Construct prompt for this specific section
         section_prompt = f"""
 {lang_instruction}
 
 You are a senior SOC analyst. Based on summarized PCAP hunting results, write ONLY the following section of the report:
 
-**{title}**
+**{display_title}**
 
-Instruction: {instruction}
+Instruction: {instruction} (WRITE IN {language.upper()})
 
 === SUMMARY ===
 {json.dumps(summary, ensure_ascii=False)}
@@ -129,10 +210,10 @@ Instruction: {instruction}
             )
             content = resp.choices[0].message.content if resp and resp.choices else ""
             if content:
-                # Add a header for the section
-                full_report_parts.append(f"## {title}\n\n{content}")
+                # Add a translated header for the section
+                full_report_parts.append(f"## {display_title}\n\n{content}")
         except Exception as e:
-            full_report_parts.append(f"## {title}\n\n_Error generating section: {str(e)}_")
+            full_report_parts.append(f"## {display_title}\n\n_Error generating section: {str(e)}_")
 
     if not full_report_parts:
         return "_No content returned from the model._"

@@ -17,9 +17,15 @@ from typing import Any
 
 import pandas as pd
 
-from app.pipeline.state import PhaseHandle
-
 logger = logging.getLogger(__name__)
+
+# --- Constants ---
+MAX_COMMON_INDICATORS = 100
+MAX_BEACON_CANDIDATES = 50
+MAX_DGA_RESULTS = 50
+MAX_TUNNELING_RESULTS = 20
+MAX_FAST_FLUX_RESULTS = 20
+MAX_CERTIFICATES = 100
 
 
 @dataclass
@@ -172,7 +178,7 @@ def correlate_results(results: list[PCAPResult]) -> CorrelationResult:
         total_unique_ips=len(all_ips),
         total_unique_domains=len(all_domains),
         time_range=(earliest_ts, latest_ts) if earliest_ts and latest_ts else None,
-        common_indicators=common_indicators[:100],  # Top 100
+        common_indicators=common_indicators[:MAX_COMMON_INDICATORS],
     )
 
 
@@ -339,9 +345,9 @@ def aggregate_dns_analysis(results: list[PCAPResult]) -> dict[str, Any]:
         "total_records": total_records,
         "unique_domains": len(all_domains),
         "query_types": dict(query_types),
-        "dga_detections": all_dga[:50],
-        "tunneling_detections": all_tunneling[:20],
-        "fast_flux_detections": all_fast_flux[:20],
+        "dga_detections": all_dga[:MAX_DGA_RESULTS],
+        "tunneling_detections": all_tunneling[:MAX_TUNNELING_RESULTS],
+        "fast_flux_detections": all_fast_flux[:MAX_FAST_FLUX_RESULTS],
         "alerts": {
             "dga_count": sum(1 for d in all_dga if d.get("is_dga")),
             "tunneling_count": sum(1 for t in all_tunneling if t.get("is_tunneling")),
@@ -395,7 +401,7 @@ def aggregate_tls_analysis(results: list[PCAPResult]) -> dict[str, Any]:
         "self_signed": self_signed,
         "expired": expired,
         "high_risk": high_risk,
-        "certificates": all_certs[:100],
+        "certificates": all_certs[:MAX_CERTIFICATES],
         "alerts": {
             "self_signed_count": self_signed,
             "expired_count": expired,

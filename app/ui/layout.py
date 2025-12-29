@@ -508,8 +508,17 @@ def render_tls_certificates(result_col, tls_analysis: dict | None):
 
                 render_export_buttons(df_certs, "tls_certs", key_suffix="certs", is_dataframe=True)
 
-                # Color-code by risk
-                st.dataframe(df_certs[display_cols], width="stretch", hide_index=True)
+                # Color-code by risk score
+                def highlight_risk(row):
+                    risk = row.get("risk_score", 0)
+                    if risk >= 0.5:
+                        return ["background-color: #ffcccb"] * len(row)  # Light red for high risk
+                    elif risk >= 0.3:
+                        return ["background-color: #fff3cd"] * len(row)  # Light yellow for medium risk
+                    return [""] * len(row)
+
+                styled_df = df_certs[display_cols].style.apply(highlight_risk, axis=1)
+                st.dataframe(styled_df, width="stretch", hide_index=True)
             else:
                 st.caption("No certificates extracted from PCAP.")
 

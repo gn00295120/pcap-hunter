@@ -41,6 +41,23 @@ BENIGN_PATTERNS = [
     r"^selector[12]\.",
 ]
 
+# --- Detection Thresholds ---
+DGA_SCORE_THRESHOLD = 0.3
+DGA_CONFIRMED_THRESHOLD = 0.5
+TUNNELING_SCORE_THRESHOLD = 0.2
+TUNNELING_CONFIRMED_THRESHOLD = 0.5
+TUNNELING_MIN_SUBDOMAINS = 5
+FAST_FLUX_SCORE_THRESHOLD = 0.2
+FAST_FLUX_CONFIRMED_THRESHOLD = 0.5
+FAST_FLUX_TOP_DOMAINS = 50
+
+# --- Result Limits ---
+MAX_DGA_RESULTS = 50
+MAX_TUNNELING_RESULTS = 20
+MAX_FAST_FLUX_RESULTS = 20
+MAX_TOP_QUERIED = 20
+MAX_COMMON_INDICATORS = 100
+
 
 @dataclass
 class DNSRecord:
@@ -113,7 +130,6 @@ def calculate_entropy(s: str) -> float:
 def calculate_consonant_ratio(s: str) -> float:
     """Calculate ratio of consonants to total alphabetic characters."""
     s = s.lower()
-    vowels = set("aeiou")
     consonants = set("bcdfghjklmnpqrstvwxyz")
     alpha_chars = [c for c in s if c.isalpha()]
     if not alpha_chars:
@@ -575,7 +591,7 @@ def analyze_dns(
 
         # DGA detection
         dga = detect_dga(domain)
-        if dga.score > 0.3:  # Only include suspicious
+        if dga.score > DGA_SCORE_THRESHOLD:
             dga_results.append(dga)
 
     if phase:
@@ -583,9 +599,9 @@ def analyze_dns(
 
     # Tunneling detection (per base domain)
     for base_domain, subdomains in domain_groups.items():
-        if len(subdomains) > 5:  # Only analyze if enough subdomains
+        if len(subdomains) > TUNNELING_MIN_SUBDOMAINS:
             tunnel = detect_tunneling(records, base_domain)
-            if tunnel.score > 0.2:
+            if tunnel.score > TUNNELING_SCORE_THRESHOLD:
                 tunneling_results.append(tunnel)
 
     if phase:
@@ -593,11 +609,11 @@ def analyze_dns(
 
     # Fast flux detection (top queried domains)
     domain_counts = Counter(r.query for r in records)
-    top_domains = [d for d, _ in domain_counts.most_common(50)]
+    top_domains = [d for d, _ in domain_counts.most_common(FAST_FLUX_TOP_DOMAINS)]
 
     for domain in top_domains:
         ff = detect_fast_flux(records, domain)
-        if ff.score > 0.2:
+        if ff.score > FAST_FLUX_SCORE_THRESHOLD:
             fast_flux_results.append(ff)
 
     # Sort by score
@@ -608,7 +624,7 @@ def analyze_dns(
     # Generate summary statistics
     query_types = Counter(r.qtype for r in records)
     response_codes = Counter(r.rcode for r in records if r.rcode and r.rcode != "-")
-    top_queried = domain_counts.most_common(20)
+    top_queried = domain_counts.most_common(MAX_TOP_QUERIED)
 
     # Unique DNS servers
     dns_servers = list({r.dst for r in records})
@@ -633,7 +649,7 @@ def analyze_dns(
                 "is_dga": r.is_dga,
                 "reason": r.reason,
             }
-            for r in dga_results[:50]  # Top 50
+            for r in dga_results[:MAX_DGA_RESULTS]
         ],
         "tunneling_detections": [
             {
@@ -648,7 +664,7 @@ def analyze_dns(
                 "is_tunneling": r.is_tunneling,
                 "reason": r.reason,
             }
-            for r in tunneling_results[:20]
+            for r in tunneling_results[:MAX_TUNNELING_RESULTS]
         ],
         "fast_flux_detections": [
             {
@@ -662,7 +678,7 @@ def analyze_dns(
                 "is_fast_flux": r.is_fast_flux,
                 "reason": r.reason,
             }
-            for r in fast_flux_results[:20]
+            for r in fast_flux_results[:MAX_FAST_FLUX_RESULTS]
         ],
         "high_risk_domains": [r.domain for r in dga_results if r.is_dga]
         + [r.domain for r in tunneling_results if r.is_tunneling]

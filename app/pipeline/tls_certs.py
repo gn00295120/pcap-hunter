@@ -9,7 +9,6 @@ Extracts X.509 certificates from PCAP files and analyzes them for:
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import logging
 import re
@@ -24,7 +23,26 @@ import pandas as pd
 from app.pipeline.state import PhaseHandle
 from app.utils.common import find_bin
 
+# Optional: Use cryptography library for robust certificate parsing
+try:
+    from cryptography import x509
+    from cryptography.hazmat.primitives.asymmetric import ec, rsa
+
+    HAS_CRYPTOGRAPHY = True
+except ImportError:
+    HAS_CRYPTOGRAPHY = False
+
 logger = logging.getLogger(__name__)
+
+# --- Constants ---
+MAX_SANS_DISPLAY = 10
+MAX_ZEEK_SSL_ENTRIES = 100
+MAX_CERTIFICATES_DISPLAY = 100
+WEAK_RSA_KEY_BITS = 2048
+WEAK_EC_KEY_BITS = 256
+HIGH_RISK_SCORE_THRESHOLD = 0.5
+LONG_VALIDITY_DAYS = 3650  # 10 years
+EXPIRY_WARNING_DAYS = 30
 
 
 @dataclass
@@ -177,7 +195,7 @@ def extract_certificates_tshark(pcap_path: str | Path, phase: PhaseHandle | None
             if len(parts) < 5:
                 continue
 
-            frame_num = parts[0] if len(parts) > 0 else ""
+            # parts[0] is frame_num (unused)
             src_ip = parts[1] if len(parts) > 1 else ""
             dst_ip = parts[2] if len(parts) > 2 else ""
             dst_port = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
@@ -194,8 +212,8 @@ def extract_certificates_tshark(pcap_path: str | Path, phase: PhaseHandle | None
             sha256_fp = hashlib.sha256(cert_bytes).hexdigest()
             sha1_fp = hashlib.sha1(cert_bytes).hexdigest()
 
-            # Extract certificate details using openssl (more reliable than tshark fields)
-            cert_info = _parse_cert_with_openssl(cert_bytes)
+            # Extract certificate details using cryptography library (with openssl fallback)
+            cert_info = _parse_cert_with_cryptography(cert_bytes)
 
             cert = Certificate(
                 serial=cert_info.get("serial", ""),
@@ -231,9 +249,76 @@ def extract_certificates_tshark(pcap_path: str | Path, phase: PhaseHandle | None
     return certificates
 
 
-def _parse_cert_with_openssl(cert_der: bytes) -> dict[str, Any]:
+def _parse_cert_with_cryptography(cert_der: bytes) -> dict[str, Any]:
     """
-    Parse certificate details using openssl.
+    Parse certificate details using the cryptography library.
+
+    Args:
+        cert_der: DER-encoded certificate bytes
+
+    Returns:
+        Dictionary with parsed certificate fields
+    """
+    result: dict[str, Any] = {}
+
+    if not HAS_CRYPTOGRAPHY:
+        return _parse_cert_with_openssl_fallback(cert_der)
+
+    try:
+        cert = x509.load_der_x509_certificate(cert_der)
+
+        # Extract subject attributes
+        subject_attrs = {attr.oid._name: attr.value for attr in cert.subject}
+        result["subject_cn"] = subject_attrs.get("commonName", "")
+        result["subject_o"] = subject_attrs.get("organizationName", "")
+
+        # Extract issuer attributes
+        issuer_attrs = {attr.oid._name: attr.value for attr in cert.issuer}
+        result["issuer_cn"] = issuer_attrs.get("commonName", "")
+        result["issuer_o"] = issuer_attrs.get("organizationName", "")
+
+        # Serial number
+        result["serial"] = format(cert.serial_number, "x")
+
+        # Validity dates (already timezone-aware in cryptography >= 42.0)
+        try:
+            result["not_before"] = cert.not_valid_before_utc
+            result["not_after"] = cert.not_valid_after_utc
+        except AttributeError:
+            # Fallback for older cryptography versions
+            result["not_before"] = cert.not_valid_before.replace(tzinfo=timezone.utc)
+            result["not_after"] = cert.not_valid_after.replace(tzinfo=timezone.utc)
+
+        # Key info
+        public_key = cert.public_key()
+        if isinstance(public_key, rsa.RSAPublicKey):
+            result["key_type"] = "RSA"
+            result["key_bits"] = public_key.key_size
+        elif isinstance(public_key, ec.EllipticCurvePublicKey):
+            result["key_type"] = "EC"
+            result["key_bits"] = public_key.key_size
+
+        # Signature algorithm
+        result["sig_alg"] = cert.signature_algorithm_oid._name
+
+        # Subject Alternative Names
+        try:
+            san_ext = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+            dns_names = san_ext.value.get_values_for_type(x509.DNSName)
+            result["sans"] = list(dns_names)
+        except x509.ExtensionNotFound:
+            result["sans"] = []
+
+    except Exception as e:
+        logger.debug(f"Cryptography parsing failed: {e}, falling back to openssl")
+        return _parse_cert_with_openssl_fallback(cert_der)
+
+    return result
+
+
+def _parse_cert_with_openssl_fallback(cert_der: bytes) -> dict[str, Any]:
+    """
+    Fallback: Parse certificate details using openssl subprocess.
 
     Args:
         cert_der: DER-encoded certificate bytes
@@ -244,7 +329,6 @@ def _parse_cert_with_openssl(cert_der: bytes) -> dict[str, Any]:
     result: dict[str, Any] = {}
 
     try:
-        # Try using openssl to parse
         proc = subprocess.run(
             ["openssl", "x509", "-inform", "DER", "-noout", "-text"],
             input=cert_der,
@@ -345,7 +429,7 @@ def _analyze_certificate(cert: Certificate) -> None:
             reasons.append("expired")
         else:
             cert.days_until_expiry = (cert.not_after - now).days
-            if cert.days_until_expiry < 30:
+            if cert.days_until_expiry < EXPIRY_WARNING_DAYS:
                 score += 0.1
                 reasons.append(f"expires in {cert.days_until_expiry} days")
 
@@ -357,16 +441,16 @@ def _analyze_certificate(cert: Certificate) -> None:
     # Check validity duration (very long = suspicious)
     if cert.not_before and cert.not_after:
         duration = (cert.not_after - cert.not_before).days
-        if duration > 3650:  # > 10 years
+        if duration > LONG_VALIDITY_DAYS:
             score += 0.2
             reasons.append(f"unusually long validity ({duration} days)")
 
     # Check weak key
     if cert.key_bits > 0:
-        if cert.key_type.lower() == "rsa" and cert.key_bits < 2048:
+        if cert.key_type.lower() == "rsa" and cert.key_bits < WEAK_RSA_KEY_BITS:
             score += 0.3
             reasons.append(f"weak {cert.key_type} key ({cert.key_bits} bits)")
-        elif cert.key_type.lower() in ("ec", "ecdsa") and cert.key_bits < 256:
+        elif cert.key_type.lower() in ("ec", "ecdsa") and cert.key_bits < WEAK_EC_KEY_BITS:
             score += 0.3
             reasons.append(f"weak {cert.key_type} key ({cert.key_bits} bits)")
 
@@ -491,14 +575,18 @@ def analyze_certificates(
         zeek_certs = extract_from_zeek_ssl(zeek_tables)
 
     # Deduplicate by fingerprint
-    seen_fingerprints = {c.fingerprint_sha256 for c in certificates}
-    unique_certs = certificates
+    unique_certs = []
+    seen_fingerprints = set()
+    for c in certificates:
+        if c.fingerprint_sha256 not in seen_fingerprints:
+            unique_certs.append(c)
+            seen_fingerprints.add(c.fingerprint_sha256)
 
     # Build summary
     self_signed_count = sum(1 for c in unique_certs if c.is_self_signed)
     expired_count = sum(1 for c in unique_certs if c.is_expired)
     not_yet_valid_count = sum(1 for c in unique_certs if c.is_not_yet_valid)
-    high_risk_count = sum(1 for c in unique_certs if c.risk_score >= 0.5)
+    high_risk_count = sum(1 for c in unique_certs if c.risk_score >= HIGH_RISK_SCORE_THRESHOLD)
 
     result = {
         "total_certificates": len(unique_certs),
@@ -518,7 +606,7 @@ def analyze_certificates(
                 "not_after": c.not_after.isoformat() if c.not_after else "",
                 "fingerprint_sha256": c.fingerprint_sha256,
                 "fingerprint_sha1": c.fingerprint_sha1,
-                "sans": c.sans[:10],  # Limit SANs
+                "sans": c.sans[:MAX_SANS_DISPLAY],
                 "key_type": c.key_type,
                 "key_bits": c.key_bits,
                 "signature_algorithm": c.signature_algorithm,
@@ -537,7 +625,7 @@ def analyze_certificates(
         "zeek_ssl_summary": {
             "total": len(zeek_certs),
             "with_issues": sum(1 for c in zeek_certs if c.get("has_issues")),
-            "entries": zeek_certs[:100],  # Limit entries
+            "entries": zeek_certs[:MAX_ZEEK_SSL_ENTRIES],
         },
         "alerts": {
             "self_signed_count": self_signed_count,

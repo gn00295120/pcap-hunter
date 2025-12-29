@@ -13,6 +13,7 @@ ZEEK_DIR = DATA_DIR / "zeek"
 LM_BASE_URL = "http://localhost:1234/v1"
 LM_API_KEY = "lm-studio"  # LM Studio doesn’t enforce this; just needs a non-empty string
 LM_MODEL = "local"
+LM_LANGUAGE = "US English"
 
 # OSINT keys (empty defaults, override with env or config UI)
 OTX_KEY = ""

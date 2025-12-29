@@ -26,6 +26,7 @@ SENSITIVE_KEYS = {
 DEFAULT_CONFIG = {
     "cfg_llm_endpoint": "http://localhost:11434/v1",
     "cfg_llm_model": "llama3.1:8b",
+    "cfg_llm_language": "US English",
     "cfg_pyshark_limit": 200000,
     "cfg_osint_top_ips": 50,
     "cfg_osint_cache_enabled": False,  # Enable/disable OSINT response caching

@@ -92,6 +92,18 @@ def pick_top_public_ips(features: dict, n: int) -> list[str]:
 st.set_page_config(page_title=C.APP_NAME, layout="wide")
 inject_css()
 st.title(C.APP_NAME)
+
+# --- RE-RUN TRIGGER LOGIC ---
+if st.session_state.get("trigger_llm_rerun"):
+    # Clear and reset LLM phase
+    st.session_state["run_active"] = True
+    llm_slug = make_slug("LLM report")
+    st.session_state[f"done_{llm_slug}"] = False
+    st.session_state[f"skip_{llm_slug}"] = False
+    st.session_state["report"] = None
+    # Consume the trigger
+    st.session_state["trigger_llm_rerun"] = False
+    st.rerun()
 init_config_defaults()
 
 # Tabs
@@ -184,6 +196,7 @@ with tab_progress:
         base_url = cfg_get("cfg_lm_base_url", "LMSTUDIO_BASE_URL", C.LM_BASE_URL)
         api_key = cfg_get("cfg_lm_api_key", "LMSTUDIO_API_KEY", C.LM_API_KEY)
         model = cfg_get("cfg_lm_model", "LMSTUDIO_MODEL", C.LM_MODEL)
+        language = cfg_get("cfg_lm_language", "LMSTUDIO_LANGUAGE", C.LM_LANGUAGE)
 
         limit_packets = int(st.session_state.get("cfg_limit_packets", C.DEFAULT_PYSHARK_LIMIT)) or None
         do_pyshark = bool(st.session_state.get("cfg_do_pyshark", True))
@@ -191,7 +204,7 @@ with tab_progress:
         do_carve = bool(st.session_state.get("cfg_do_carve", True))
         pre_count = bool(st.session_state.get("cfg_pre_count", True))
         osint_top_n = int(st.session_state.get("cfg_osint_top_ips", C.OSINT_TOP_IPS_DEFAULT) or 0)
-
+        
         osint_keys = {
             "OTX_KEY": st.session_state.get("cfg_otx", ""),
             "VT_KEY": st.session_state.get("cfg_vt", ""),
@@ -398,8 +411,13 @@ with tab_progress:
 
         # LLM — pass FULL CONTEXT
         p = tracker.next_phase("LLM report")
-        if not st.session_state.get(f"done_{make_slug('LLM report')}", False):
-            if not st.session_state.get(f"skip_{make_slug('LLM report')}", False):
+        
+        llm_slug = make_slug("LLM report")
+        llm_done = st.session_state.get(f"done_{llm_slug}", False)
+        llm_skip = st.session_state.get(f"skip_{llm_slug}", False)
+
+        if not llm_done:
+            if not llm_skip:
                 with st.spinner("Generating LLM report via LM Studio…"):
                     zeek_json = {
                         name: (df.to_dict(orient="records") if isinstance(df, pd.DataFrame) else [])
@@ -430,7 +448,12 @@ with tab_progress:
                     }
 
                     try:
-                        report_md = generate_report(base_url, api_key, model, context)
+                        # FORCE REFRESH: Get latest language setting from session state
+                        current_lang = st.session_state.get("cfg_lm_language", "US English")
+                        print(f"Generating report with language='{current_lang}'", flush=True)
+                        st.toast(f"Generating report in {current_lang}...", icon="📝")
+                        
+                        report_md = generate_report(base_url, api_key, model, context, language=current_lang)
                     except Exception as e:
                         st.error(f"LLM call failed: {e}")
                         report_md = "_LLM generation failed. Check server/model settings._"

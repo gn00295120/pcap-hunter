@@ -13,6 +13,7 @@ By combining industry-standard network analysis tools (**Zeek**, **Tshark**) wit
 - **Local & Cloud LLM Support**:
   - **Local Privacy**: Fully compatible with local models via [LM Studio](https://lmstudio.ai/) (e.g., Llama 3, Mistral) for air-gapped or privacy-sensitive analysis.
   - **Cloud Power**: Supports OpenAI-compatible APIs for leveraging larger models like GPT-4.
+- **Multi-Language Support**: Generates reports in multiple languages (English, Traditional/Simplified Chinese, Japanese, Korean, Italian, Spanish, French, German) with region-specific terminology.
 - **Context-Aware**: The AI is fed a structured summary of network flows, Zeek logs, and OSINT data, acting as an expert co-pilot.
 
 ### 2. 🔍 Deep Packet Inspection & Flow Analysis
@@ -104,6 +105,8 @@ Integrates with leading threat intelligence providers to validate indicators of 
    - Set your LLM endpoint (default: `http://localhost:1234/v1`).
    - Add API keys for OSINT services (optional but recommended).
    - Toggle specific analysis phases (e.g., enable/disable "OSINT Cache", "Carving").
+   - **Re-run Report**: If you change the language or model, click "Re-run Report" to regenerate just the LLM report without re-processing the PCAP.
+   - **Clear Data**: Use the "Clear All Data" button in the Config tab to completely wipe the workspace for a fresh start.
 3. **Analyze**: Click **Extract & Analyze**.
 4. **Monitor**: Watch the **Progress** tab as the pipeline executes:
    - *Packet Counting* -> *Parsing* -> *Zeek* -> *DNS/JA3* -> *Beaconing* -> *Carving* -> *OSINT* -> *Reporting*.

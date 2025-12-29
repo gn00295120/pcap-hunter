@@ -1,8 +1,10 @@
 import os
+import time
 
 import streamlit as st
 
 from app import config as C
+from app.llm.client import test_connection, fetch_models
 from app.utils.config_manager import get_config_manager
 
 # Keys to persist (mapping session_state key -> config file key)
@@ -10,6 +12,7 @@ PERSIST_KEYS = {
     "cfg_lm_base_url": "cfg_llm_endpoint",
     "cfg_lm_api_key": "cfg_openai_key",
     "cfg_lm_model": "cfg_llm_model",
+    "cfg_lm_language": "cfg_llm_language",
     "cfg_otx": "cfg_otx_key",
     "cfg_vt": "cfg_vt_key",
     "cfg_abuseipdb": "cfg_abuseipdb_key",
@@ -33,6 +36,7 @@ def init_config_defaults():
     _ss_default("cfg_lm_base_url", saved_config.get("cfg_llm_endpoint") or os.getenv("LMSTUDIO_BASE_URL", C.LM_BASE_URL))
     _ss_default("cfg_lm_api_key", saved_config.get("cfg_openai_key") or os.getenv("LMSTUDIO_API_KEY", C.LM_API_KEY))
     _ss_default("cfg_lm_model", saved_config.get("cfg_llm_model") or os.getenv("LMSTUDIO_MODEL", C.LM_MODEL))
+    _ss_default("cfg_lm_language", saved_config.get("cfg_llm_language") or os.getenv("LMSTUDIO_LANGUAGE", C.LM_LANGUAGE))
 
     # OSINT keys
     _ss_default("cfg_otx", saved_config.get("cfg_otx_key") or os.getenv("OTX_KEY", C.OTX_KEY))
@@ -99,9 +103,104 @@ def render_config_tab():
         st.session_state["cfg_lm_base_url"] = st.text_input(
             "OpenAI base_url", value=st.session_state.get("cfg_lm_base_url")
         )
-        st.session_state["cfg_lm_model"] = st.text_input("Model name", value=st.session_state.get("cfg_lm_model"))
     with c2:
         st.session_state["cfg_lm_api_key"] = st.text_input("API Key", value=st.session_state.get("cfg_lm_api_key"))
+
+    # Buttons and shared status
+    b1, b2, b3, _ = st.columns([1, 1, 1, 1])
+    
+    # Action flags
+    do_test = False
+    do_fetch = False
+    do_rerun = False
+    
+    with b1:
+        if st.button("Test Connection"):
+            do_test = True
+    with b2:
+        if st.button("Fetch Models"):
+            do_fetch = True
+    with b3:
+        if st.button("Re-run Report"):
+            do_rerun = True
+            
+    # Combined status area
+    if do_test:
+        with st.spinner("Testing connection..."):
+            err = test_connection(
+                st.session_state["cfg_lm_base_url"],
+                st.session_state["cfg_lm_api_key"],
+                st.session_state.get("cfg_lm_model", ""), # Model might be empty or valid
+            )
+            if not err:
+                st.success("Connection successful!")
+            else:
+                st.error(f"Connection failed: {err}")
+
+    if do_fetch:
+        with st.spinner("Fetching models..."):
+            models = fetch_models(
+                st.session_state.get("cfg_lm_base_url"),
+                st.session_state.get("cfg_lm_api_key"),
+            )
+            if models:
+                st.session_state["available_models"] = models
+                st.success(f"Found {len(models)} models.")
+            else:
+                st.error("Could not fetch models. Check URL/Key.")
+
+    if do_rerun:
+        st.session_state["trigger_llm_rerun"] = True
+        st.success("Re-run triggered. Reloading...")
+        st.rerun()
+
+    # Model selection
+    available = st.session_state.get("available_models", [])
+    current_model = st.session_state.get("cfg_lm_model", "")
+    
+    if available:
+        # If current model is not in available, add it or just default to index 0
+        index = 0
+        if current_model in available:
+            index = available.index(current_model)
+        
+        selected = st.selectbox("Model name", available, index=index)
+        st.session_state["cfg_lm_model"] = selected
+    else:
+        st.session_state["cfg_lm_model"] = st.text_input("Model name", value=current_model)
+
+    # Language Selection
+    current_lang = st.session_state.get("cfg_lm_language", "US English")
+    languages = [
+        "US English",
+        "Tradition Chinese (zh-tw)",
+        "Simplified Chinese (zh-cn)",
+        "Japanese",
+        "Korean",
+        "Italian",
+        "Spanish",
+        "French",
+        "German",
+    ]
+    
+    # Callback to update the real config key before script reruns
+    def _update_lang():
+        st.session_state["cfg_lm_language"] = st.session_state["widget_lm_language"]
+
+    try:
+        lang_idx = languages.index(current_lang)
+    except ValueError:
+        lang_idx = 0
+        
+    # Use a proxy key 'widget_lm_language' to avoid GC issues when the tab is skipped,
+    # but use on_change to ensure 'cfg_lm_language' is updated immediately.
+    st.selectbox(
+        "Report Language", 
+        languages, 
+        index=lang_idx, 
+        key="widget_lm_language", 
+        on_change=_update_lang
+    )
 
     st.markdown("---")
     st.markdown("#### OSINT API Keys (optional)")
@@ -131,7 +230,7 @@ def render_config_tab():
         st.session_state["cfg_zeek_bin"] = zeek_path
 
         # Check status
-        from app.utils.common import find_bin
+        from app.utils.common import find_bin, make_slug
 
         resolved_zeek = find_bin("zeek", env_key="ZEEK_BIN", cfg_key="cfg_zeek_bin")
         if resolved_zeek:
@@ -195,7 +294,7 @@ def render_config_tab():
     st.markdown("#### Save / Load Configuration")
     st.caption("Save your settings to persist across sessions. API keys are encrypted.")
 
-    col_buttons = st.columns([1, 1, 1, 1, 4])
+    col_buttons = st.columns([1, 1, 1, 1, 1, 3])
     with col_buttons[0]:
         if st.button("Save Config", type="primary"):
             if save_config():
@@ -222,6 +321,34 @@ def render_config_tab():
             init_config_defaults()
             st.success("Config reset to defaults.")
             st.rerun()
+    with col_buttons[4]:
+        if st.button("Clear Data", help="Delete all uploaded PCAPs and analysis results"):
+            import shutil
+            try:
+                # Wiping data directory contents
+                if C.DATA_DIR.exists():
+                    for item in C.DATA_DIR.iterdir():
+                        if item.is_file() and item.name != ".gitkeep":
+                            item.unlink()
+                        elif item.is_dir():
+                            shutil.rmtree(item)
+                
+                # Re-create structure
+                C.ZEEK_DIR.mkdir(parents=True, exist_ok=True)
+                C.CARVE_DIR.mkdir(parents=True, exist_ok=True)
+                
+                st.success("All data cleared successfully.")
+                # Optional: Clear runtime state related to data
+                st.session_state["features"] = None
+                st.session_state["osint"] = None
+                st.session_state["report"] = None
+                st.session_state["zeek_tables"] = {}
+                st.session_state["carved"] = []
+                
+                time.sleep(1) # Give user a moment to see success
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error clearing data: {e}")
 
     st.markdown("---")
     with st.expander("Runtime Logs"):

@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0-alpha] - 2025-12-29
+
+### Added
+- **Multi-Language Reporting**:
+    - Generates threat reports in 9 supported languages: US English, Traditional Chinese (Taiwan), Simplified Chinese (Mainland), Japanese, Korean, Italian, Spanish, French, and German.
+    - Includes proper prompt engineering for region-specific terminology (e.g., Taiwan vs Mainland China usage).
+- **Report Management**:
+    - **Re-run Report**: Added a button to regenerate only the LLM report using existing artifacts, saving time when switching languages or models.
+    - **Clear All Data**: New button to wipe all uploaded PCAPs, Zeek logs, and carved files for a clean workspace.
+- **Improved Report Reliability**:
+    - Refactored report generation to process sections (Executive Summary, Key Findings, etc.) individually, preventing timeouts and token limit issues on long reports.
+
+### Fixed
+- **OSINT Dialogs**: Resolved `StreamlitAPIException` when selecting rows in OSINT tables by improving session state tracking for dialogs.
+- **Language Persistence**: Fixed an issue where the selected report language would reset during a re-run by adhering to strict session state binding.
+- **Report Truncation**: Increased token limits for "Recommended Actions" and refined prompts to ensure actionable advice is not cut off.
+
 ## [0.2.0-alpha] - 2025-12-01
 
 ### Added

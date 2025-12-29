@@ -205,6 +205,12 @@ def show_whois_dialog(target: str):
 
 
 def render_osint(result_col, osint_data):
+    # Initialize selection state trackers
+    if "last_ip_sel" not in st.session_state:
+        st.session_state["last_ip_sel"] = []
+    if "last_dom_sel" not in st.session_state:
+        st.session_state["last_dom_sel"] = []
+
     with result_col:
         # Use tabs instead of columns for better space
         tab_ips, tab_doms = st.tabs(["IP Addresses", "Domains"])
@@ -231,10 +237,16 @@ def render_osint(result_col, osint_data):
                     selection_mode="single-row",
                     key=f"osint_ips_{len(ip_rows)}",
                 )
-                if event.selection.rows:
-                    idx = event.selection.rows[0]
-                    target_ip = df_ips.iloc[idx]["IP"]
-                    show_whois_dialog(target_ip)
+                
+                current_sel = event.selection.rows
+                # Check for change
+                if current_sel != st.session_state["last_ip_sel"]:
+                    st.session_state["last_ip_sel"] = current_sel
+                    # If new selection is present, show dialog
+                    if current_sel:
+                        idx = current_sel[0]
+                        target_ip = df_ips.iloc[idx]["IP"]
+                        show_whois_dialog(target_ip)
             else:
                 st.info("No public IP findings.")
 
@@ -258,10 +270,14 @@ def render_osint(result_col, osint_data):
                     selection_mode="single-row",
                     key=f"osint_doms_{len(dom_rows)}",
                 )
-                if event.selection.rows:
-                    idx = event.selection.rows[0]
-                    target_dom = df_doms.iloc[idx]["Domain"]
-                    show_whois_dialog(target_dom)
+                
+                current_sel = event.selection.rows
+                if current_sel != st.session_state["last_dom_sel"]:
+                    st.session_state["last_dom_sel"] = current_sel
+                    if current_sel:
+                        idx = current_sel[0]
+                        target_dom = df_doms.iloc[idx]["Domain"]
+                        show_whois_dialog(target_dom)
             else:
                 st.info("No domain findings.")
 

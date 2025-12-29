@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from openai import OpenAI
 
@@ -23,9 +23,11 @@ Avoid generic advice. Focus on specific indicators found in the data. If no sign
 state that clearly but note any interesting anomalies."""
 
 
-def generate_report(base_url: str, api_key: str, model: str, context: Dict[str, Any]) -> str:
+def generate_report(
+    base_url: str, api_key: str, model: str, context: Dict[str, Any], language: str = "US English"
+) -> str:
     """
-    Generate an LLM report using a summarized context that always fits small context models (4k).
+    Generate an LLM report using a summarized context.
     """
 
     # --- Summaries ---
@@ -69,34 +71,106 @@ def generate_report(base_url: str, api_key: str, model: str, context: Dict[str, 
         "sample_beacon": beacon[:5] if isinstance(beacon, list) else [],
     }
 
-    prompt = f"""
-You are a senior SOC analyst. Based on summarized PCAP hunting results, write a concise and actionable report.
+    # Language instruction logic
+    lang_instruction = ""
+    if language == "Tradition Chinese (zh-tw)":
+        lang_instruction = "IMPORTANT: You MUST write the entire report in Traditional Chinese (using Taiwan usage/wording/vocabulary)."
+    elif language == "Simplified Chinese (zh-cn)":
+        lang_instruction = "IMPORTANT: You MUST write the entire report in Simplified Chinese (using Mainland China usage/wording/vocabulary)."
+    elif language != "US English":
+        lang_instruction = f"IMPORTANT: You MUST write the entire report in {language}."
+
+    # Define sections to generate separately
+    sections = [
+        ("Executive Summary", "Write the 'Executive Summary' section. Focus on high-level impact and critical findings."),
+        ("Key Findings", "Write the 'Key Findings' section. List the most important observations."),
+        ("Indicators & Evidence", "Write the 'Indicators & Evidence' section. Include IPs, domains, hashes, and notable Zeek records."),
+        ("OSINT Corroboration", "Write the 'OSINT Corroboration' section. Cite data from VT/GreyNoise/Shodan if available."),
+        ("Potential Beaconing / C2 Rationale", "Write the 'Potential Beaconing / C2 Rationale' section. Explain detailed reasoning for suspect flows."),
+        ("Risk Assessment", "Write the 'Risk Assessment (Low/Med/High) and Likely Impact' section."),
+        ("Recommended Actions", "Write the 'Recommended Actions' section. Provide a concise, prioritized list of the top 5-7 concrete steps."),
+    ]
+
+    client = OpenAI(base_url=base_url, api_key=api_key)
+    
+    # Common system message
+    msg_system = SYSTEM_INSTRUCTIONS
+    if lang_instruction:
+        msg_system += f"\n\n{lang_instruction}"
+    
+    full_report_parts = []
+    
+    for title, instruction in sections:
+        # Construct prompt for this specific section
+        section_prompt = f"""
+{lang_instruction}
+
+You are a senior SOC analyst. Based on summarized PCAP hunting results, write ONLY the following section of the report:
+
+**{title}**
+
+Instruction: {instruction}
 
 === SUMMARY ===
 {json.dumps(summary, ensure_ascii=False)}
 
 === HIGHLIGHTS (examples only, not full data) ===
 {json.dumps(highlights, ensure_ascii=False)}
+"""
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": msg_system},
+                    {"role": "user", "content": section_prompt},
+                ],
+                max_tokens=2000, # Per section
+                temperature=0.2,
+            )
+            content = resp.choices[0].message.content if resp and resp.choices else ""
+            if content:
+                # Add a header for the section
+                full_report_parts.append(f"## {title}\n\n{content}")
+        except Exception as e:
+            full_report_parts.append(f"## {title}\n\n_Error generating section: {str(e)}_")
 
-Write the report in 7 sections:
-1. Executive Summary
-2. Key Findings
-3. Indicators & Evidence (IPs/domains/hashes, notable Zeek records)
-4. OSINT Corroboration (from VT/GreyNoise/Shodan/etc.)
-5. Potential Beaconing / C2 Rationale
-6. Risk Assessment (Low/Med/High) and Likely Impact
-7. Recommended Actions (prioritized, concrete)
+    if not full_report_parts:
+        return "_No content returned from the model._"
+
+    return "\n\n".join(full_report_parts)
+
+
+def test_connection(base_url: str, api_key: str, model: str) -> str:
     """
+    Test connectivity to the LLM endpoint by performing a minimal API call.
+    Returns an empty string on success, or an error message on failure.
+    """
+    if not base_url:
+        return "Missing Base URL."
 
-    client = OpenAI(base_url=base_url, api_key=api_key)
+    try:
+        client = OpenAI(base_url=base_url, api_key=api_key or "lm-studio")
+        client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=1,
+        )
+        return ""
+    except Exception as e:
+        return str(e)
 
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_INSTRUCTIONS},
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=1200,
-        temperature=0.2,
-    )
-    return resp.choices[0].message.content if resp and resp.choices else "_No content returned from the model._"
+
+def fetch_models(base_url: str, api_key: str) -> List[str]:
+    """
+    Fetch available models from the LLM endpoint.
+    Returns a list of model IDs. Returns an empty list on failure.
+    """
+    if not base_url:
+        return []
+
+    try:
+        client = OpenAI(base_url=base_url, api_key=api_key or "lm-studio")
+        models = client.models.list()
+        return [m.id for m in models]
+    except Exception:
+        return []

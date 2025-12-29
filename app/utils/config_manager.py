@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import platform
 from pathlib import Path
 from typing import Any
 
@@ -61,7 +62,8 @@ class ConfigManager:
     def _create_fernet(self) -> Fernet:
         """Create Fernet instance with machine-derived key."""
         # Use machine-specific salt (hostname + username)
-        machine_id = f"{os.getenv('USER', 'user')}@{os.uname().nodename}".encode()
+        # platform.node() is cross-platform (works on Windows, macOS, Linux)
+        machine_id = f"{os.getenv('USER', os.getenv('USERNAME', 'user'))}@{platform.node()}".encode()
 
         # Derive key using PBKDF2
         kdf = PBKDF2HMAC(

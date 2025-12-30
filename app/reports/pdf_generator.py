@@ -195,9 +195,11 @@ class PDFReportGenerator:
         if tls_analysis and not tls_analysis.get("skipped"):
             sections.append(self._render_tls_section(tls_analysis))
 
-        # YARA Results
-        if self.config.include_yara and yara_results and yara_results.get("yara_available"):
-            sections.append(self._render_yara_section(yara_results))
+        # YARA Results - show if available flag is set OR if there are actual results
+        if self.config.include_yara and yara_results:
+            has_results = yara_results.get("yara_available") or yara_results.get("scanned", 0) > 0
+            if has_results:
+                sections.append(self._render_yara_section(yara_results))
 
         # Flow Analysis
         if self.config.include_raw_data and features.get("flows"):

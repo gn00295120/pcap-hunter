@@ -6,9 +6,12 @@ import csv
 import io
 import json
 import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+
+# Namespace UUID for deterministic STIX ID generation
+STIX_NAMESPACE = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +234,7 @@ class IOCExporter:
         iocs = self.filter_iocs(iocs, ioc_types, min_score)
 
         if not iocs:
-            return b"type,value,context,priority_score,tags\n"
+            return b"type,value,context,priority_score,tags,osint_summary\n"
 
         output = io.StringIO()
         writer = csv.writer(output)
@@ -342,7 +345,7 @@ class IOCExporter:
                 indicator = {
                     "type": "indicator",
                     "spec_version": "2.1",
-                    "id": f"indicator--{hash(ioc.value) & 0xFFFFFFFF:08x}",
+                    "id": f"indicator--{uuid.uuid5(STIX_NAMESPACE, ioc.value)}",
                     "name": f"{ioc.ioc_type.upper()}: {ioc.value}",
                     "pattern": pattern,
                     "pattern_type": "stix",

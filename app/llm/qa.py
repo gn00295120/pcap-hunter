@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
 
-from openai import OpenAI
+from openai import APIConnectionError, APIStatusError, OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -14,14 +13,17 @@ logger = logging.getLogger(__name__)
 MAX_QUESTION_LENGTH = 500
 
 # Patterns that may indicate prompt injection attempts
+# Note: "user:" is too generic and causes false positives (e.g., "user:password")
+# Use more specific patterns that detect role manipulation attempts
 INJECTION_PATTERNS = [
     r"(?i)(ignore|forget|disregard)\s+(previous|above|all|prior)",
-    r"(?i)system\s*:",
-    r"(?i)assistant\s*:",
-    r"(?i)human\s*:",
-    r"(?i)user\s*:",
+    r"(?i)^system\s*:",  # Only at start of line
+    r"(?i)^assistant\s*:",  # Only at start of line
+    r"(?i)^human\s*:",  # Only at start of line
+    r"(?i)^\[?(user|human)\]?\s*:",  # Role format at start: "user:", "[user]:"
     r"(?i)```\s*(system|instruction)",
     r"(?i)<\s*(system|instruction)",
+    r"(?i)new\s+instruction[s]?\s*:",  # "new instructions:"
 ]
 
 
@@ -322,10 +324,16 @@ class AnalysisQA:
 
             return answer
 
+        except APIConnectionError as e:
+            logger.error(f"API connection error in Q&A: {e}")
+            return "Unable to connect to the LLM service. Please check your configuration."
+        except APIStatusError as e:
+            logger.error(f"API status error in Q&A: {e.status_code} - {e.message}")
+            return f"LLM service error (status {e.status_code}): {e.message}"
         except Exception as e:
-            logger.error(f"Error in Q&A: {e}")
-            error_msg = f"Error processing question: {str(e)}"
-            return error_msg
+            # Catch-all for unexpected errors (e.g., response parsing issues)
+            logger.error(f"Unexpected error in Q&A: {type(e).__name__}: {e}")
+            return f"Error processing question: {type(e).__name__}"
 
     def get_suggested_questions(self) -> list[str]:
         """

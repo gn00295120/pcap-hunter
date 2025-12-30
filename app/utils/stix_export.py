@@ -151,7 +151,7 @@ class STIXExporter:
             return None
 
         # Build description
-        description_parts = [f"IOC extracted from PCAP analysis"]
+        description_parts = ["IOC extracted from PCAP analysis"]
         if ioc.context:
             description_parts.append(f"Context: {ioc.context}")
         if ioc.osint_summary:
@@ -204,12 +204,8 @@ class STIXExporter:
 
     def _create_observable(self, ioc: "IOCRecord") -> dict | None:
         """Create STIX Cyber Observable from IOC."""
-        obs_id = generate_stix_id("observed-data", ioc.value)
-        now = datetime.now(timezone.utc)
-
         # Create the appropriate SCO (STIX Cyber Observable)
         sco = None
-        sco_id = None
 
         if ioc.ioc_type == "ip":
             sco_type = "ipv6-addr" if ":" in ioc.value else "ipv4-addr"
@@ -246,10 +242,7 @@ class STIXExporter:
                 "hashes": {hash_type: ioc.value},
             }
 
-        if not sco:
-            return None
-
-        return sco, obs_id
+        return sco
 
     def _determine_hash_type(self, hash_value: str) -> str:
         """Determine hash type from length."""
@@ -291,9 +284,8 @@ class STIXExporter:
                 objects.append(indicator)
 
             # Create observable
-            result = self._create_observable(ioc)
-            if result:
-                sco, obs_id = result
+            sco = self._create_observable(ioc)
+            if sco:
                 sco_objects.append(sco)
 
         # Add all SCOs
@@ -378,7 +370,7 @@ class STIXExporter:
                 objects.append(attack_pattern)
 
                 # Create relationships from indicators to attack patterns
-                for indicator_id in indicator_ids[:5]:  # Limit relationships
+                for indicator_id in indicator_ids:
                     relationship = {
                         "type": "relationship",
                         "spec_version": "2.1",

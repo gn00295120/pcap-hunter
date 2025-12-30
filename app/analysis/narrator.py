@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -99,6 +99,7 @@ class AttackNarrator:
         yara_results: dict | None = None,
         beacon_results: list | None = None,
         tls_analysis: dict | None = None,
+        base_timestamp: datetime | None = None,
     ) -> list[TimelineEvent]:
         """
         Extract chronological events from analysis results.
@@ -109,11 +110,19 @@ class AttackNarrator:
             yara_results: YARA scan results
             beacon_results: Beacon candidates
             tls_analysis: TLS analysis results
+            base_timestamp: Base timestamp for events (defaults to analysis time)
 
         Returns:
             List of TimelineEvents sorted by severity
         """
         events: list[TimelineEvent] = []
+
+        # Use provided base timestamp or extract from features, fallback to now
+        if base_timestamp is None:
+            base_timestamp = self._extract_base_timestamp(features) or datetime.now()
+
+        # Event index for relative time offset when no timestamp available
+        event_idx = 0
 
         # Add beacon events (highest priority)
         if beacon_results:
@@ -121,9 +130,14 @@ class AttackNarrator:
                 if isinstance(beacon, dict):
                     score = beacon.get("score", 0)
                     if score >= 0.5:
+                        # Try to get timestamp from beacon data
+                        event_time = self._get_event_timestamp(
+                            beacon, base_timestamp, event_idx
+                        )
+                        event_idx += 1
                         events.append(
                             TimelineEvent(
-                                timestamp=datetime.now(),
+                                timestamp=event_time,
                                 event_type="c2_beacon",
                                 description=f"C2 beaconing to {beacon.get('dst', 'unknown')}:{beacon.get('dport', '')} "
                                 f"(score: {score:.2f})",
@@ -140,9 +154,11 @@ class AttackNarrator:
                 severity = result.get("severity", "medium")
                 matches = result.get("matches", [])
                 rule_names = [m.get("rule_name", "") for m in matches[:3]]
+                event_time = self._get_event_timestamp(result, base_timestamp, event_idx)
+                event_idx += 1
                 events.append(
                     TimelineEvent(
-                        timestamp=datetime.now(),
+                        timestamp=event_time,
                         event_type="yara_match",
                         description=f"Malware detected in {result.get('file_name', 'unknown')}: "
                         f"{', '.join(rule_names)}",
@@ -159,9 +175,11 @@ class AttackNarrator:
             if alerts.get("dga_count", 0) > 0:
                 dga_list = dns_analysis.get("dga_detections", [])[:MAX_DNS_DETECTIONS]
                 domains = [d.get("domain", "") for d in dga_list]
+                event_time = self._get_event_timestamp(dns_analysis, base_timestamp, event_idx)
+                event_idx += 1
                 events.append(
                     TimelineEvent(
-                        timestamp=datetime.now(),
+                        timestamp=event_time,
                         event_type="dga_detection",
                         description=f"DGA domains detected: {', '.join(domains)}",
                         severity="high",
@@ -171,9 +189,11 @@ class AttackNarrator:
 
             # DNS tunneling
             if alerts.get("tunneling_count", 0) > 0:
+                event_time = self._get_event_timestamp(dns_analysis, base_timestamp, event_idx)
+                event_idx += 1
                 events.append(
                     TimelineEvent(
-                        timestamp=datetime.now(),
+                        timestamp=event_time,
                         event_type="dns_tunneling",
                         description=f"DNS tunneling indicators ({alerts['tunneling_count']} suspicious queries)",
                         severity="high",
@@ -186,11 +206,13 @@ class AttackNarrator:
                 alert_type = alert.get("type", "")
                 cert = alert.get("cert", "unknown")
                 severity = alert.get("severity", "medium")
+                event_time = self._get_event_timestamp(alert, base_timestamp, event_idx)
+                event_idx += 1
 
                 if alert_type == "self_signed":
                     events.append(
                         TimelineEvent(
-                            timestamp=datetime.now(),
+                            timestamp=event_time,
                             event_type="tls_anomaly",
                             description=f"Self-signed certificate for {cert}",
                             severity=severity,
@@ -200,7 +222,7 @@ class AttackNarrator:
                 elif alert_type == "expired":
                     events.append(
                         TimelineEvent(
-                            timestamp=datetime.now(),
+                            timestamp=event_time,
                             event_type="tls_anomaly",
                             description=f"Expired certificate for {cert}",
                             severity=severity,
@@ -218,6 +240,52 @@ class AttackNarrator:
             events = events[:MAX_TIMELINE_EVENTS]
 
         return events
+
+    def _extract_base_timestamp(self, features: dict | None) -> datetime | None:
+        """Extract base timestamp from features data (e.g., earliest flow time)."""
+        if not features:
+            return None
+
+        # Try to get timestamp from flows
+        flows = features.get("flows", [])
+        if flows:
+            for flow in flows:
+                # Try common timestamp field names
+                for ts_field in ["timestamp", "start_time", "first_seen", "ts"]:
+                    ts_val = flow.get(ts_field)
+                    if ts_val:
+                        try:
+                            if isinstance(ts_val, datetime):
+                                return ts_val
+                            if isinstance(ts_val, (int, float)):
+                                return datetime.fromtimestamp(ts_val)
+                            if isinstance(ts_val, str):
+                                return datetime.fromisoformat(ts_val.replace("Z", "+00:00"))
+                        except (ValueError, OSError):
+                            continue
+        return None
+
+    def _get_event_timestamp(
+        self, data: dict, base_timestamp: datetime, event_idx: int
+    ) -> datetime:
+        """Get timestamp for an event, using actual data or relative offset."""
+        # Try to extract timestamp from event data
+        for ts_field in ["timestamp", "time", "first_seen", "last_seen", "ts"]:
+            ts_val = data.get(ts_field)
+            if ts_val:
+                try:
+                    if isinstance(ts_val, datetime):
+                        return ts_val
+                    if isinstance(ts_val, (int, float)):
+                        return datetime.fromtimestamp(ts_val)
+                    if isinstance(ts_val, str):
+                        return datetime.fromisoformat(ts_val.replace("Z", "+00:00"))
+                except (ValueError, OSError):
+                    continue
+
+        # Fallback: create relative timestamp (offset by event index)
+        # Events are spaced 1 minute apart for readability
+        return base_timestamp + timedelta(minutes=event_idx)
 
     def generate_narrative(
         self,

@@ -8,6 +8,12 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Default total number of VirusTotal engines for normalization
+VT_DEFAULT_TOTAL_ENGINES = 70
+
+# Default synthetic VT score for JA3 malware matches (71% detection rate)
+JA3_MALWARE_DEFAULT_DETECTIONS = 50
+
 
 @dataclass
 class ScoredIOC:
@@ -148,7 +154,7 @@ class IOCScorer:
         vt_data = osint_data.get("virustotal", {})
         if vt_data:
             detections = vt_data.get("detections", 0)
-            total = vt_data.get("total", 70)
+            total = vt_data.get("total", VT_DEFAULT_TOTAL_ENGINES)
             if total > 0:
                 vt_ratio = detections / total
                 vt_contribution = vt_ratio * self.weights["vt_detections"]
@@ -307,7 +313,6 @@ class IOCScorer:
         self,
         iocs: list[dict],
         osint: dict | None = None,
-        features: dict | None = None,
         beacon_results: list | None = None,
     ) -> list[ScoredIOC]:
         """
@@ -316,14 +321,12 @@ class IOCScorer:
         Args:
             iocs: List of IOC dicts with 'type' and 'value'
             osint: OSINT data by IP/domain
-            features: Analysis features
             beacon_results: Beacon analysis results
 
         Returns:
             List of ScoredIOC sorted by priority (highest first)
         """
         osint = osint or {}
-        features = features or {}
         beacon_results = beacon_results or []
 
         # Build behavioral data lookup
@@ -349,7 +352,13 @@ class IOCScorer:
             elif ioc_type == "ja3":
                 ja3_info = osint.get("ja3", {}).get(ioc_value, {})
                 if ja3_info.get("malware"):
-                    osint_data = {"virustotal": {"detections": 50, "total": 70}}
+                    # Synthetic OSINT score for known JA3 malware fingerprint
+                    osint_data = {
+                        "virustotal": {
+                            "detections": JA3_MALWARE_DEFAULT_DETECTIONS,
+                            "total": VT_DEFAULT_TOTAL_ENGINES,
+                        }
+                    }
 
             # Get behavioral data
             behavioral_data = {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import Any
@@ -17,6 +18,9 @@ MAX_YARA_RESULTS = 20
 MAX_TLS_ALERTS = 20
 MAX_JA3_FINGERPRINTS = 50
 MAX_FLOWS = 1000
+
+# Average packet size estimate (bytes) when only packet count is available
+AVG_PACKET_SIZE_ESTIMATE = 800
 
 
 @dataclass
@@ -493,9 +497,36 @@ class ATTACKMapper:
         return techniques
 
     def _check_ja3_from_features(self, features: dict) -> list[TechniqueMatch]:
-        """Check JA3 from features artifacts."""
-        # This is a simplified check - in production, would lookup against database
-        return []
+        """Check JA3 fingerprints from features artifacts for known malware signatures."""
+        techniques = []
+        artifacts = features.get("artifacts", {})
+        ja3_list = artifacts.get("ja3", [])[:MAX_JA3_FINGERPRINTS]
+
+        if not ja3_list:
+            return techniques
+
+        # Known malicious JA3 patterns (subset for demonstration)
+        # In production, this would query a threat intel database
+        known_malware_ja3 = {
+            "72a589da586844d7f0818ce684948eea": "Emotet",
+            "a0e9f5d64349fb13191bc781f81f42e1": "TrickBot",
+        }
+
+        for ja3 in ja3_list:
+            ja3_hash = ja3 if isinstance(ja3, str) else ja3.get("hash", "")
+            if ja3_hash in known_malware_ja3:
+                malware_name = known_malware_ja3[ja3_hash]
+                techniques.append(
+                    TechniqueMatch(
+                        technique_id="T1071.001",
+                        technique_name="Web Protocols",
+                        tactic="command-and-control",
+                        confidence=0.85,
+                        evidence=[f"Known malware JA3 fingerprint detected: {malware_name}"],
+                    )
+                )
+
+        return techniques
 
     def _check_data_transfer(self, features: dict) -> list[TechniqueMatch]:
         """Check for large data transfers indicating exfiltration."""
@@ -508,7 +539,7 @@ class ATTACKMapper:
         outbound_by_dst: dict[str, int] = {}
         for flow in flows:
             dst = flow.get("dst", "")
-            bytes_count = flow.get("bytes", 0) or flow.get("count", 0) * 1000  # Estimate
+            bytes_count = flow.get("bytes", 0) or flow.get("count", 0) * AVG_PACKET_SIZE_ESTIMATE
             if dst:
                 outbound_by_dst[dst] = outbound_by_dst.get(dst, 0) + bytes_count
 

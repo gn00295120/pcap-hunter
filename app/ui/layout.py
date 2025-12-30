@@ -360,7 +360,7 @@ def render_dns_analysis(result_col, dns_analysis: dict | None):
     """Render DNS analysis results with DGA, tunneling, and fast flux detection."""
     with result_col:
         expanded = bool(
-            dns_analysis
+            dns_analysis is not None
             and (
                 dns_analysis.get("alerts", {}).get("dga_count", 0)
                 or dns_analysis.get("alerts", {}).get("tunneling_count", 0)
@@ -368,7 +368,7 @@ def render_dns_analysis(result_col, dns_analysis: dict | None):
             )
         )
         with st.expander("DNS Analysis", expanded=expanded):
-            if not dns_analysis or dns_analysis.get("error") or dns_analysis.get("skipped"):
+            if dns_analysis is None or dns_analysis.get("error") or dns_analysis.get("skipped"):
                 st.caption("No DNS analysis data available.")
                 return
 
@@ -470,7 +470,7 @@ def render_tls_certificates(result_col, tls_analysis: dict | None):
     """Render TLS certificate analysis results."""
     with result_col:
         expanded = bool(
-            tls_analysis
+            tls_analysis is not None
             and (
                 tls_analysis.get("alerts", {}).get("self_signed_count", 0)
                 or tls_analysis.get("alerts", {}).get("expired_count", 0)
@@ -478,7 +478,7 @@ def render_tls_certificates(result_col, tls_analysis: dict | None):
             )
         )
         with st.expander("TLS Certificates", expanded=expanded):
-            if not tls_analysis or tls_analysis.get("skipped"):
+            if tls_analysis is None or tls_analysis.get("skipped"):
                 st.caption("No TLS certificate data available.")
                 return
 
@@ -732,7 +732,7 @@ def render_yara_results(result_col, yara_results: dict | None):
 def render_attack_mapping(result_col, attack_mapping):
     """Render MITRE ATT&CK mapping results."""
     with result_col:
-        if not attack_mapping:
+        if attack_mapping is None:
             return
 
         expanded = bool(attack_mapping.techniques)
@@ -819,7 +819,7 @@ def render_attack_mapping(result_col, attack_mapping):
 def render_ioc_export(result_col, features: dict | None, osint: dict | None, scores: dict | None = None):
     """Render IOC export options."""
     with result_col:
-        if not features or not features.get("artifacts"):
+        if features is None or not features.get("artifacts"):
             return
 
         artifacts = features.get("artifacts", {})
@@ -956,7 +956,7 @@ def render_ioc_scores(result_col, scored_iocs: list | None):
 def render_qa_interface(result_col, qa_session):
     """Render interactive Q&A interface."""
     with result_col:
-        if not qa_session:
+        if qa_session is None:
             return
 
         with st.expander("Ask Questions About Analysis", expanded=False):

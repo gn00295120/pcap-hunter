@@ -60,6 +60,7 @@ def sanitize_question(question: str) -> str:
 
     return question
 
+
 # System prompt for Q&A
 QA_SYSTEM_PROMPT = (
     "You are an expert Security Analyst assistant. "

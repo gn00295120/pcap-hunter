@@ -131,9 +131,7 @@ class AttackNarrator:
                     score = beacon.get("score", 0)
                     if score >= 0.5:
                         # Try to get timestamp from beacon data
-                        event_time = self._get_event_timestamp(
-                            beacon, base_timestamp, event_idx
-                        )
+                        event_time = self._get_event_timestamp(beacon, base_timestamp, event_idx)
                         event_idx += 1
                         events.append(
                             TimelineEvent(
@@ -265,9 +263,7 @@ class AttackNarrator:
                             continue
         return None
 
-    def _get_event_timestamp(
-        self, data: dict, base_timestamp: datetime, event_idx: int
-    ) -> datetime:
+    def _get_event_timestamp(self, data: dict, base_timestamp: datetime, event_idx: int) -> datetime:
         """Get timestamp for an event, using actual data or relative offset."""
         # Try to extract timestamp from event data
         for ts_field in ["timestamp", "time", "first_seen", "last_seen", "ts"]:
@@ -340,8 +336,8 @@ class AttackNarrator:
         # Extract IOCs with limits
         artifacts = (features or {}).get("artifacts", {})
         iocs = []
-        iocs.extend(artifacts.get("ips", [])[:MAX_IOCS_IN_PROMPT // 2])
-        iocs.extend(artifacts.get("domains", [])[:MAX_IOCS_IN_PROMPT // 2])
+        iocs.extend(artifacts.get("ips", [])[: MAX_IOCS_IN_PROMPT // 2])
+        iocs.extend(artifacts.get("domains", [])[: MAX_IOCS_IN_PROMPT // 2])
         iocs_text = ", ".join(iocs) if iocs else "No critical IOCs identified"
 
         # Build context

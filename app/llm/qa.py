@@ -61,18 +61,19 @@ def sanitize_question(question: str) -> str:
     return question
 
 # System prompt for Q&A
-QA_SYSTEM_PROMPT = """You are an expert Security Analyst assistant. You have access to the results of a PCAP network traffic analysis.
-
-Your role is to answer questions about the analysis findings, explain detected threats, and provide security recommendations.
-
-When answering:
-1. Be specific and reference actual findings from the data
-2. Use professional security terminology
-3. Provide actionable advice when appropriate
-4. If information is not available in the analysis, say so clearly
-5. Keep answers concise but complete
-
-The analysis data is provided in the context below."""
+QA_SYSTEM_PROMPT = (
+    "You are an expert Security Analyst assistant. "
+    "You have access to the results of a PCAP network traffic analysis.\n\n"
+    "Your role is to answer questions about the analysis findings, "
+    "explain detected threats, and provide security recommendations.\n\n"
+    "When answering:\n"
+    "1. Be specific and reference actual findings from the data\n"
+    "2. Use professional security terminology\n"
+    "3. Provide actionable advice when appropriate\n"
+    "4. If information is not available in the analysis, say so clearly\n"
+    "5. Keep answers concise but complete\n\n"
+    "The analysis data is provided in the context below."
+)
 
 # Suggested questions based on findings
 SUGGESTED_QUESTIONS = {

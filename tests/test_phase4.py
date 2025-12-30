@@ -1,22 +1,27 @@
 """Tests for Phase 4 features: AI Enhancement and Export."""
 
 import json
+
 import pytest
 
-from app.threat_intel.attack_mapping import (
-    ATTACKMapper,
-    AttackMapping,
-    TechniqueMatch,
-)
 from app.analysis.ioc_scorer import (
-    IOCScorer,
-    ScoredIOC,
     DEFAULT_WEIGHTS,
     PRIORITY_THRESHOLDS,
+    IOCScorer,
+    ScoredIOC,
 )
 from app.analysis.narrator import (
     AttackNarrator,
     TimelineEvent,
+)
+from app.llm.qa import (
+    SUGGESTED_QUESTIONS,
+    AnalysisQA,
+)
+from app.threat_intel.attack_mapping import (
+    ATTACKMapper,
+    AttackMapping,
+    TechniqueMatch,
 )
 from app.utils.ioc_export import (
     IOCExporter,
@@ -24,23 +29,17 @@ from app.utils.ioc_export import (
     generate_ioc_filename,
 )
 from app.utils.navigator_export import (
-    export_navigator_layer,
-    export_navigator_json,
-    generate_navigator_filename,
     _confidence_to_color,
+    export_navigator_json,
+    export_navigator_layer,
+    generate_navigator_filename,
 )
 from app.utils.stix_export import (
     STIXExporter,
-    generate_stix_id,
     generate_stix_filename,
+    generate_stix_id,
     validate_stix_bundle,
 )
-from app.llm.qa import (
-    AnalysisQA,
-    QA_SYSTEM_PROMPT,
-    SUGGESTED_QUESTIONS,
-)
-
 
 # =============================================================================
 # ATT&CK Mapping Tests
@@ -717,7 +716,7 @@ class TestPromptInjectionProtection:
             sanitize_question("   ")
 
     def test_sanitize_rejects_too_long(self):
-        from app.llm.qa import sanitize_question, MAX_QUESTION_LENGTH
+        from app.llm.qa import MAX_QUESTION_LENGTH, sanitize_question
 
         long_question = "a" * (MAX_QUESTION_LENGTH + 1)
         with pytest.raises(ValueError, match="too long"):
@@ -753,7 +752,7 @@ class TestResourceLimits:
     """Test resource limit protections."""
 
     def test_narrator_limits_timeline_events(self):
-        from app.analysis.narrator import AttackNarrator, MAX_TIMELINE_EVENTS
+        from app.analysis.narrator import MAX_TIMELINE_EVENTS, AttackNarrator
 
         narrator = AttackNarrator()
         # Create many beacon results
@@ -763,7 +762,7 @@ class TestResourceLimits:
         assert len(timeline) <= MAX_TIMELINE_EVENTS
 
     def test_attack_mapper_limits_beacons(self):
-        from app.threat_intel.attack_mapping import ATTACKMapper, MAX_BEACON_RESULTS
+        from app.threat_intel.attack_mapping import ATTACKMapper
 
         mapper = ATTACKMapper()
         # Create many beacon results
@@ -789,7 +788,7 @@ class TestConfigurableThresholds:
         scorer = IOCScorer(thresholds=custom_thresholds)
 
         # Score that would be "critical" with defaults but "high" with custom
-        scored = scorer.score_ioc(
+        result = scorer.score_ioc(
             "1.2.3.4",
             "ip",
             osint_data={"virustotal": {"detections": 50, "total": 70}},  # ~0.71 VT ratio * 0.25 weight = ~0.18
@@ -797,3 +796,4 @@ class TestConfigurableThresholds:
         )
         # With custom thresholds, a score of ~0.85 should be "high" not "critical"
         assert scorer.thresholds["critical"] == 0.9
+        assert result.priority_label in ("high", "medium", "low")  # Not critical with higher threshold
